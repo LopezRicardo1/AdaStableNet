@@ -1,16 +1,26 @@
 Package: AdaStableNet
-Type: Package
-Title: What the Package Does (Title Case)
+Title: Adaptive Eigenvalue-Based Estimation of Linear ODE Systems
 Version: 0.1.0
-Authors@R: c(
-    person(
-      "Jane", "Doe",
-      email = "jane@example.com",
-      role = c("aut", "cre")
-    )
-  )
-Description: More about what it does (maybe more than one line).
-    Continuation lines should be indented.
-License: What license is it under?
+Authors@R: person("Ricardo J.", "Lopez Candelaria", 
+                  email = "rlopez.research@gmail.com", 
+                  role = c("aut", "cre"))
+Description: Implements adaptive estimation of dynamic system matrices from multivariate time series 
+    using a two-stage approach and penalized eigenvalue stability. Includes smoothing, basis 
+    construction, ridge inversion, and penalized fitting with optional Torch support.
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
+Depends:
+    R (>= 3.5)
+Imports:
+    stats,
+    fda,
+    torch,
+    Matrix, 
+    expm
+RoxygenNote: 7.3.3
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat
+VignetteBuilder: knitr
