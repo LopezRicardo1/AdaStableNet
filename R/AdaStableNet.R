@@ -35,7 +35,6 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
   num_single <- length(initial_cc)
   num_pairs <- length(initial_a)
 
-  # ---- 1. Initial Training ----
   if (verbose) cat("Starting initial training...\n")
   model_initial <- nn_module(
     initialize = function() {
@@ -81,30 +80,38 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
       cat(sprintf("Initial Iter [%d/%d] Loss = %.6f\n", iteration, num_iter, loss$item()))
     }
   }
-  if (verbose) cat("Initial training complete.\n")
 
-  # Extract final parameters
   a <- as.numeric(model_instance$a)
   b <- as.numeric(model_instance$b$abs())
   cc <- if (!is.null(initial_cc)) as.numeric(model_instance$cc) else NULL
 
-  # Get unbounded output
+  if (verbose) {
+    cat("Initial training complete.\n")
+    cat("Estimated Eigenvalues - Initial Training:\n")
+    for (i in seq_len(num_pairs)) {
+      cat(sprintf("  Complex Eigenvalue Pair %d: a = %.4f, b = %.4f\n", i, a[i], b[i]))
+    }
+    if (!is.null(cc)) {
+      for (i in seq_along(cc)) {
+        cat(sprintf("  Single Real Eigenvalue %d: cc = %.4f\n", i, cc[i]))
+      }
+    }
+  }
+
   Unbounded <- ada_output(a, b, cc, tt, Y, ridge.pen)
 
-  # ---- 2. Wald Test Masking ----
+  # -- Wald test --
   Wald_Real <- NULL
   if (eigen_real_wald) {
     if (verbose) cat("Wald test on real eigenvalues...\n")
     res <- as.numeric(Y - Unbounded$X_hat)
     sigma <- sqrt(mean(res^2))
-    A_var = TheoVar(sigma, Unbounded$x0_hat, A = Unbounded$A_hat, tt = as.numeric(tt))
-    zs_a <- sqrt(a^2 / A_var$re.eigs.sigma2[1:num_pairs *2])
+    A_var <- TheoVar(sigma, Unbounded$x0_hat, A = Unbounded$A_hat, tt = as.numeric(tt))
+    zs_a <- sqrt(a^2 / A_var$re.eigs.sigma2[1:num_pairs * 2])
     zs_cc <- if (!is.null(cc)) sqrt(cc^2 / A_var$re.eigs.sigma2[-(1:(num_pairs * 2))]) else NULL
     a_wald <- as.numeric(zs_a > wald_critical)
     cc_wald <- if (!is.null(cc)) as.numeric(zs_cc > wald_critical) else NULL
-    if (verbose && any(cc_wald == 0)) message("At least one cc_i = 0 after Wald test.")
 
-    if (verbose) cat("Retraining with Wald masking...\n")
     model_wald <- nn_module(
       initialize = function() {
         self$a <- nn_parameter(torch_tensor(a, requires_grad = TRUE))
@@ -115,7 +122,8 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
       },
       forward = function(tt, Y, ridge.pen, a_wald, cc_wald) {
         S <- ode_basis(tt, self$a * a_wald, self$b$abs(),
-                       if (!is.null(self$cc)) self$cc * cc_wald else NULL, a_wald, cc_wald)
+                       if (!is.null(self$cc)) self$cc * cc_wald else NULL,
+                       a_wald, cc_wald)
         SS <- torch_matmul(S, S$t())
         SS_eig <- linalg_eig(SS)
         values <- SS_eig[[1]]$real
@@ -126,6 +134,7 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
         nnf_mse_loss(Y, X_hat)
       }
     )
+
     model_instance <- model_wald()
     optimizer <- optim_adam(model_instance$parameters, lr = lr)
     prev_loss <- Inf
@@ -140,13 +149,27 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
       }
       prev_loss <- loss$item()
     }
+
     a <- as.numeric(model_instance$a) * a_wald
     b <- as.numeric(model_instance$b$abs())
     cc <- if (!is.null(initial_cc)) as.numeric(model_instance$cc) * cc_wald else NULL
+
+    if (verbose) {
+      cat("Estimated Eigenvalues - Wald Real:\n")
+      for (i in seq_len(num_pairs)) {
+        cat(sprintf("  Complex Eigenvalue Pair %d: a = %.4f, b = %.4f\n", i, a[i], b[i]))
+      }
+      if (!is.null(cc)) {
+        for (i in seq_along(cc)) {
+          cat(sprintf("  Single Real Eigenvalue %d: cc = %.4f\n", i, cc[i]))
+        }
+      }
+    }
+
     Wald_Real <- ada_output(a, b, cc, tt, Y, ridge.pen, a_wald, cc_wald)
   }
 
-  # ---- 3. Eigenvalue Bounding ----
+  # -- Eigenvalue bounding --
   Eigen_Bound <- NULL
   if (eigen_bound) {
     if (!eigen_real_wald) {
@@ -154,9 +177,11 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
       cc_wald <- if (is.null(initial_cc)) NULL else rep(1, length(cc))
     }
     if (is.null(initial_cc)) cc_wald <- NULL
+
     a <- as.numeric(model_instance$a$abs()$log())
     b <- as.numeric(model_instance$b$abs()$log())
-    cc <- if (is.null(initial_cc)) NULL else as.numeric(model_instance$cc$abs()$log())
+    cc <- if (!is.null(initial_cc)) as.numeric(model_instance$cc$abs()$log()) else NULL
+
     if (verbose) cat("Performing eigen-bound optimization...\n")
 
     model_bound <- nn_module(
@@ -198,9 +223,23 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
       }
       prev_loss <- loss$item()
     }
+
     a <- as.numeric(-model_instance$a$exp()) * a_wald
     b <- as.numeric(model_instance$b$exp())
     cc <- if (is.null(initial_cc)) NULL else as.numeric(-model_instance$cc$exp()) * cc_wald
+
+    if (verbose) {
+      cat("Estimated Eigenvalues - Eigen Bound:\n")
+      for (i in seq_len(num_pairs)) {
+        cat(sprintf("  Complex Eigenvalue Pair %d: a = %.4f, b = %.4f\n", i, a[i], b[i]))
+      }
+      if (!is.null(cc)) {
+        for (i in seq_along(cc)) {
+          cat(sprintf("  Single Real Eigenvalue %d: cc = %.4f\n", i, cc[i]))
+        }
+      }
+    }
+
     Eigen_Bound <- ada_output(a, b, cc, tt, Y, ridge.pen, a_wald, cc_wald)
   }
 
