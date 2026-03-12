@@ -53,7 +53,7 @@ ada_output <- function(a, b, cc, tt, Y, ridge.pen, a_wald = NULL, cc_wald = NULL
   # Return full-rank outputs
   list(
     A_hat = as.matrix(A_hat),
-    x0_hat = as.numeric(P[,1]),
+    x0_hat = as.numeric(X_hat[,1]),
     X_hat = as.matrix(X_hat),
     P = as.matrix(P),
     ODE_Basis = as.matrix(S)
