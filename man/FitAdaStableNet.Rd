@@ -18,8 +18,8 @@ FitAdaStableNet(
   eigen_bound = TRUE,
   lr = 0.001,
   num_iter = 5000,
-  tol = 0.001,
-  ridge.pen = 0.01,
+  tol = 0.1,
+  ridge.pen = 0.001,
   verbose = TRUE
 )
 }
