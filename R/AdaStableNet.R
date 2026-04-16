@@ -28,7 +28,7 @@
 #' @export
 AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
                          eigen_real_wald = TRUE, wald_critical = 2, eigen_bound = TRUE,
-                         lr = 0.01, num_iter = 1000, tol = 1e-3, ridge.pen = 1e-2, verbose = TRUE) {
+                         lr = 0.01, num_iter = 1000, tol = 1e-1, ridge.pen = 1e-3, verbose = TRUE) {
 
   Y <- torch_tensor(Y)
   tt <- torch_tensor(tt)

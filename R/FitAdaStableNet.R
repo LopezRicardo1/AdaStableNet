@@ -35,7 +35,7 @@ FitAdaStableNet <- function(Y, tt, nbasis = 100, lambda_range = c(-20, 10),
                             fit_ode2fd = TRUE, complex_pairs = TRUE,
                             eigen_real_wald = TRUE, wald_critical = 2,
                             eigen_bound = TRUE, lr = 0.001, num_iter = 5000,
-                            tol = 1e-3, ridge.pen = 0.01, verbose = TRUE) {
+                            tol = 1e-1, ridge.pen = 0.001, verbose = TRUE) {
 
   if (verbose) cat("Starting two-stage dynamic estimation...\n")
   ode2stage_results <- ode2stage(Y = Y, tt = tt, nbasis = nbasis,
