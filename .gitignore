@@ -2,3 +2,9 @@
 .Rhistory
 .RData
 .Ruserdata
+.DS_Store
+*.Rcheck/
+*.tar.gz
+vignettes/*.html
+vignettes/*.pdf
+README.html

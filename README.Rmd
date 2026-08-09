@@ -1,0 +1,80 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file. -->
+
+# AdaStableNet
+
+AdaStableNet estimates a constant dynamic matrix in the autonomous linear ODE
+
+\[
+\frac{dX(t)}{dt} = A X(t)
+\]
+
+from a noisy multivariate trajectory. It combines functional-data smoothing,
+gradient-matching initialization, and profiled nonlinear least squares in a
+real modal basis. The package returns unconstrained, Wald-screened, and
+stability-constrained fits together with diagnostics and forecasting methods.
+
+## Installation
+
+```r
+# install.packages("pak")
+pak::pak("LopezRicardo1/AdaStableNet")
+```
+
+## Quick start
+
+```{r setup, message=FALSE}
+library(AdaStableNet)
+```
+
+```{r example}
+sim <- simulate_adastablenet(
+  p = 3,
+  n_time = 31,
+  spectrum = "stable",
+  sigma = 0.03,
+  seed = 2026
+)
+
+fit <- FitAdaStableNet(
+  sim$Y,
+  sim$time,
+  nbasis = 12,
+  twoSE = FALSE,
+  eigen_real_wald = FALSE,
+  num_iter = 100,
+  verbose = FALSE
+)
+
+fit
+summary(fit)
+```
+
+The fitted dynamic matrix and future trajectory use standard R methods:
+
+```{r methods}
+A_hat <- coef(fit, branch = "stable")
+future <- predict(fit, new_time = seq(0, 2, length.out = 101))
+head(future)
+```
+
+## Model branches
+
+- `unbounded` estimates modal real parts without a sign constraint.
+- `wald` sets modal real parts that are not distinguishable from zero to zero.
+- `stable` constrains retained real parts to lie below `stability_margin`, which
+  is zero by default.
+
+The package checks the rank and condition number of the fitted modal loading
+matrix and reports the actual spectral abscissa of every reconstructed system
+matrix. See `vignette("simulation-study", package = "AdaStableNet")` for the
+reproducible simulation design and compact benchmark.
+
+## Scope
+
+The current model assumes a constant, autonomous, homogeneous linear ODE with
+all states observed and a complete diagonalizable real modal representation.
+The approximate Wald calculations condition on the fitted initial state.

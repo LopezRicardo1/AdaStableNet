@@ -1,0 +1,8 @@
+bibentry(
+  bibtype = "Manual",
+  title = "AdaStableNet: Adaptive Eigenvalue-Based Estimation of Linear ODE Systems",
+  author = person("Ricardo J.", "Lopez Candelaria"),
+  year = "2026",
+  note = "R package version 0.2.0",
+  url = "https://github.com/LopezRicardo1/AdaStableNet"
+)
