@@ -94,6 +94,36 @@ loading-matrix condition number is the intended design. See
 `vignette("simulation-study", package = "AdaStableNet")` for the reproducible
 simulation design and compact benchmark.
 
+## Source the simulation study
+
+The installed runner uses the original sparse (p=16), seed-777 marginal design
+and (p=15), seed-888 mixed design. This quick run uses two replications per
+design:
+
+```r
+Sys.setenv(
+  ADASTABLENET_N_REP = 2,
+  ADASTABLENET_NOISE_SD = "0.30",
+  ADASTABLENET_OUTPUT_DIR = file.path(
+    getwd(), "adastablenet-simulation-results"
+  )
+)
+
+source(system.file(
+  "scripts", "run-simulation-study.R",
+  package = "AdaStableNet"
+))
+
+simulation_system_diagnostics
+head(simulation_results)
+simulation_summary
+```
+
+For the paper run, set `ADASTABLENET_N_REP = 500` and
+`ADASTABLENET_NOISE_SD = "0.05,0.15,0.30"` before sourcing the same file. The
+runner checkpoints every completed replication, so sourcing it again with the
+same output directory resumes the study.
+
 ## Scope
 
 The current model assumes a constant, autonomous, homogeneous linear ODE with

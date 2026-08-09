@@ -231,19 +231,39 @@ boxplot(
 
 ## Paper-scale protocol
 
+The complete sourceable runner is installed with the package. A two-replication
+check can be launched with:
+
+```{r source-runner, eval=FALSE}
+Sys.setenv(
+  ADASTABLENET_N_REP = 2,
+  ADASTABLENET_NOISE_SD = "0.30",
+  ADASTABLENET_OUTPUT_DIR = file.path(
+    getwd(), "adastablenet-simulation-results"
+  )
+)
+source(system.file(
+  "scripts", "run-simulation-study.R",
+  package = "AdaStableNet"
+))
+```
+
+It writes one checkpoint after every fitted replication and can therefore be
+resumed safely by sourcing the script again with the same output directory.
+
 The journal simulation should extend the executable experiment along the
 following prespecified axes:
 
 | Factor | Recommended levels |
 |---|---|
 | Spectrum | stable, marginal, mixed, near-boundary, unstable |
-| Dimension (p) | 4, 8, 16 |
+| Dimension (p) | 15 and 16 for the primary sparse designs |
 | Observation times | 31, 61, 101 |
 | Noise SD | 0.05, 0.15, 0.30 |
 | Matrix structure | sparse (primary), dense (sensitivity analysis) |
 | Sparse loading threshold | 0.25, 0.50, 0.65 |
 | Dense loading condition number | 1, 10, 50 |
-| Replications per retained cell | at least 500 |
+| Replications per retained cell | at least 500; 1000 for the main cells |
 
 The primary comparisons are the two-stage initializer and the unbounded,
 Wald-screened, and stable AdaStableNet branches. External methods such as STSLS

@@ -66,3 +66,24 @@ test_that("multiple trajectories use an array", {
   expect_equal(dim(x$Y), c(10, 4, 3))
   expect_equal(dim(x$x0), c(4, 3))
 })
+
+test_that("simulation study runner is installed and sourceable", {
+  script <- system.file(
+    "scripts", "run-simulation-study.R", package = "AdaStableNet"
+  )
+  expect_true(nzchar(script))
+  expect_true(file.exists(script))
+
+  old_autorun <- Sys.getenv("ADASTABLENET_AUTORUN", unset = NA_character_)
+  on.exit({
+    if (is.na(old_autorun)) {
+      Sys.unsetenv("ADASTABLENET_AUTORUN")
+    } else {
+      Sys.setenv(ADASTABLENET_AUTORUN = old_autorun)
+    }
+  }, add = TRUE)
+  Sys.setenv(ADASTABLENET_AUTORUN = "false")
+  runner_environment <- new.env(parent = globalenv())
+  sys.source(script, envir = runner_environment)
+  expect_true(is.function(runner_environment$run_adastablenet_simulation))
+})

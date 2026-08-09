@@ -1,6 +1,6 @@
 Package: AdaStableNet
 Title: Adaptive Eigenvalue-Based Estimation of Linear ODE Systems
-Version: 0.2.1
+Version: 0.2.2
 Authors@R: person("Ricardo J.", "Lopez Candelaria", 
                   email = "rlopez.research@gmail.com", 
                   role = c("aut", "cre"))

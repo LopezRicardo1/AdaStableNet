@@ -1,3 +1,9 @@
+# AdaStableNet 0.2.2
+
+* Added an installed, sourceable simulation-study runner with the canonical
+  sparse p = 15 and p = 16 designs, per-replication checkpoints, failure and
+  warning capture, matrix and trajectory metrics, CSV summaries, and plots.
+
 # AdaStableNet 0.2.1
 
 * Changed `simulate_adastablenet()` to use the sparse block-embedding,
