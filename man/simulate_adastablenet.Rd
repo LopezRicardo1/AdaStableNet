@@ -10,6 +10,8 @@ simulate_adastablenet(
   time_range = c(0, 1),
   spectrum = c("stable", "marginal", "mixed", "near_boundary", "unstable"),
   sigma = 0.1,
+  matrix_structure = c("sparse", "dense"),
+  sparse_threshold = 0.5,
   condition_number = 5,
   n_trajectories = 1L,
   seed = NULL
@@ -27,20 +29,36 @@ near-boundary, or unstable.}
 
 \item{sigma}{Observation-noise standard deviation.}
 
-\item{condition_number}{Target condition number of the modal loading matrix.}
+\item{matrix_structure}{Generate an eigen-bound-style sparse system or a
+dense conditioned system.}
+
+\item{sparse_threshold}{Quantile of the nonzero absolute loading entries set
+to zero in the sparse construction. The default reproduces median
+thresholding from the eigen-bound simulation.}
+
+\item{condition_number}{For the dense construction, the target condition
+number of the modal loading matrix. For the sparse construction, the
+maximum accepted condition number; the identity is used when this equals
+one.}
 
 \item{n_trajectories}{Number of independent initial conditions.}
 
 \item{seed}{Optional random seed.}
 }
 \value{
-An object of class \code{adastablenet_simulation}. For one trajectory,
-\code{X} and \code{Y} are time-by-state matrices; otherwise they are
-time-by-state-by-trajectory arrays.
+An object of class \code{adastablenet_simulation} containing the system
+matrices \code{A}, \code{J}, and \code{Q}; noise-free and observed trajectories \code{X} and
+\code{Y}; the time grid; modal parameters; eigenvalues; and matrix-structure
+diagnostics. \code{A_sparsity} and \code{Q_sparsity} are the proportions of entries
+with absolute magnitude below \code{1e-12}. For one trajectory, \code{X} and \code{Y}
+are time-by-state matrices; otherwise they are time-by-state-by-trajectory
+arrays.
 }
 \description{
-Generates a diagonalizable real linear ODE with controlled spectral regime
-and non-normality. The same system matrix is shared across trajectories while
+Generates a diagonalizable real linear ODE with controlled spectral regime,
+matrix structure, and non-normality. The default sparse construction follows
+the block-embedding and thresholding design used in the original eigen-bound
+simulation. The same system matrix is shared across trajectories while
 initial conditions and observation errors vary.
 }
 \examples{

@@ -19,8 +19,11 @@ and forecasting methods.
 ## Installation
 
 ``` r
-# install.packages("pak")
-pak::pak("LopezRicardo1/AdaStableNet")
+# install.packages("devtools")
+devtools::install_github(
+  "LopezRicardo1/AdaStableNet",
+  build_vignettes = TRUE
+)
 ```
 
 ## Quick start
@@ -28,6 +31,24 @@ pak::pak("LopezRicardo1/AdaStableNet")
 ``` r
 library(AdaStableNet)
 ```
+
+The simulator defaults to the sparse construction used in the original
+eigen-bound study:
+
+``` r
+study_system <- simulate_adastablenet(
+  p = 16,
+  n_time = 31,
+  spectrum = "marginal",
+  sigma = 0.03,
+  seed = 777
+)
+c(Q_sparsity = study_system$Q_sparsity,
+  A_sparsity = study_system$A_sparsity)
+```
+
+    ## Q_sparsity A_sparsity
+    ##  0.9062500  0.8515625
 
 ``` r
 sim <- simulate_adastablenet(
@@ -55,8 +76,8 @@ fit
     ##   States: 3
     ##   Time points: 31
     ##   Selected branch: stable
-    ##   Training MSE: 0.00017412
-    ##   Spectral abscissa: -0.078533
+    ##   Training MSE: 0.00018312
+    ##   Spectral abscissa: -0.047677
     ##   Modal loading rank: 3/3
 
 ``` r
@@ -65,14 +86,14 @@ summary(fit)
 
     ## AdaStableNet summary
     ##   Dimensions: 31 time points x 3 states
-    ##   Smoothing: Minimum GCV (lambda = 1.776e-06)
+    ##   Smoothing: Minimum GCV (lambda = 5.584e-05)
     ##
     ##     branch        mse spectral_abscissa modal_rank loading_condition
-    ##  unbounded 0.00017412         -0.078533          3            13.807
-    ##     stable 0.00017412         -0.078533          3            13.807
+    ##  unbounded 0.00018312         -0.047677          3            2.2526
+    ##     stable 0.00018312         -0.047677          3            2.2526
     ##  convergence evaluations
-    ##            0          39
-    ##            0          12
+    ##            0           9
+    ##            0          10
 
 The fitted dynamic matrix and future trajectory use standard R methods:
 
@@ -83,12 +104,12 @@ head(future)
 ```
 
     ##           [,1]      [,2]      [,3]
-    ## [1,] -4.857326 -1.856237 0.8588049
-    ## [2,] -4.849353 -1.920652 1.0964955
-    ## [3,] -4.766955 -1.950483 1.3229905
-    ## [4,] -4.611650 -1.945384 1.5347597
-    ## [5,] -4.386096 -1.905556 1.7285147
-    ## [6,] -4.094040 -1.831743 1.9012597
+    ## [1,] 0.9280274 0.8627282 -1.835413
+    ## [2,] 0.8145696 0.8856514 -1.870516
+    ## [3,] 0.6994422 0.8944568 -1.906190
+    ## [4,] 0.5844161 0.8890336 -1.941763
+    ## [5,] 0.4712574 0.8694946 -1.976563
+    ## [6,] 0.3616997 0.8361743 -2.009935
 
 ## Model branches
 
@@ -100,7 +121,10 @@ head(future)
 
 The package checks the rank and condition number of the fitted modal
 loading matrix and reports the actual spectral abscissa of every
-reconstructed system matrix. See
+reconstructed system matrix. The simulator defaults to the sparse
+block-embedding construction from the original eigen-bound study. Use
+`matrix_structure = "dense"` when an exact loading-matrix condition
+number is the intended design. See
 `vignette("simulation-study", package = "AdaStableNet")` for the
 reproducible simulation design and compact benchmark.
 

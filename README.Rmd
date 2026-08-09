@@ -20,14 +20,32 @@ stability-constrained fits together with diagnostics and forecasting methods.
 ## Installation
 
 ```r
-# install.packages("pak")
-pak::pak("LopezRicardo1/AdaStableNet")
+# install.packages("devtools")
+devtools::install_github(
+  "LopezRicardo1/AdaStableNet",
+  build_vignettes = TRUE
+)
 ```
 
 ## Quick start
 
 ```{r setup, message=FALSE}
 library(AdaStableNet)
+```
+
+The simulator defaults to the sparse construction used in the original
+eigen-bound study:
+
+```{r sparse-design}
+study_system <- simulate_adastablenet(
+  p = 16,
+  n_time = 31,
+  spectrum = "marginal",
+  sigma = 0.03,
+  seed = 777
+)
+c(Q_sparsity = study_system$Q_sparsity,
+  A_sparsity = study_system$A_sparsity)
 ```
 
 ```{r example}
@@ -70,8 +88,11 @@ head(future)
 
 The package checks the rank and condition number of the fitted modal loading
 matrix and reports the actual spectral abscissa of every reconstructed system
-matrix. See `vignette("simulation-study", package = "AdaStableNet")` for the
-reproducible simulation design and compact benchmark.
+matrix. The simulator defaults to the sparse block-embedding construction from
+the original eigen-bound study. Use `matrix_structure = "dense"` when an exact
+loading-matrix condition number is the intended design. See
+`vignette("simulation-study", package = "AdaStableNet")` for the reproducible
+simulation design and compact benchmark.
 
 ## Scope
 

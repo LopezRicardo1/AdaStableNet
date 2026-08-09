@@ -1,3 +1,10 @@
+# AdaStableNet 0.2.1
+
+* Changed `simulate_adastablenet()` to use the sparse block-embedding,
+  permutation, and median-thresholding construction from the eigen-bound study
+  by default. The prior dense conditioned generator remains available through
+  `matrix_structure = "dense"`.
+
 # AdaStableNet 0.2.0
 
 * Reimplemented the profiled modal estimator with a deterministic base-R
