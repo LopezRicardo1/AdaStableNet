@@ -22,6 +22,10 @@ to assess AdaStableNet. The main estimand is the matrix (A) in
 X'(t)=A X(t), \qquad X(t)=\exp\{A(t-t_0)\}X(t_0).
 \]
 
+This is a standard time-domain ODE setting. Observations are multivariate state
+measurements collected at ordered times; they are not cells, and the time
+variable is observed directly rather than inferred as pseudotime.
+
 The experiment separates three questions:
 
 1. How accurately is (A) recovered?
@@ -176,7 +180,7 @@ abline(v = 1, lty = 3)
 The compact experiment runs during package checks. Set the environment variable
 `ADASTABLENET_FULL_VIGNETTE=true` before rendering to increase the replication
 count. A paper-scale run should use a job array and preserve one result file per
-design cell.
+design condition.
 
 ```{r simulation}
 n_rep <- if (identical(Sys.getenv("ADASTABLENET_FULL_VIGNETTE"), "true")) 100L else 2L
@@ -298,7 +302,7 @@ following prespecified axes:
 | Optimization backend | base, torch; report device and package version |
 | Sparse loading threshold | 0.25, 0.50, 0.65 |
 | Dense loading condition number | 1, 10, 50 |
-| Replications per retained cell | at least 500; 1000 for the main cells |
+| Replications per retained condition | at least 500; 1000 for the main conditions |
 
 The primary comparisons are the two-stage initializer and the unbounded,
 Wald-screened, and stable AdaStableNet branches. External methods such as STSLS
@@ -313,7 +317,7 @@ and elapsed time.
 Oracle-initial-state forecasts and estimated-initial-state forecasts answer
 different questions and must be reported separately.
 
-For Wald inference, additional null and alternative cells should report
+For Wald inference, additional null and alternative conditions should report
 type-I error, power, interval coverage, false discovery rate, and edge-selection
 accuracy. Monte Carlo standard errors and paired method differences should
 accompany all summary tables.

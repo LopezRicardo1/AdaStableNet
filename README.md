@@ -16,6 +16,11 @@ least squares in a real modal basis. The package returns unconstrained,
 Wald-screened, and stability-constrained fits together with diagnostics
 and forecasting methods.
 
+The data are conventional time-domain trajectories: each row of the main
+interface is an ordered observation time and each column is a system
+state. AdaStableNet does not treat observations as biological cells and
+does not infer or use pseudotime.
+
 ## Installation
 
 ``` r
@@ -75,6 +80,7 @@ fit
     ## AdaStableNet fit
     ##   States: 3
     ##   Time points: 31
+    ##   Backend: base
     ##   Selected branch: stable
     ##   Training MSE: 0.00018312
     ##   Spectral abscissa: -0.047677
@@ -88,9 +94,9 @@ summary(fit)
     ##   Dimensions: 31 time points x 3 states
     ##   Smoothing: Minimum GCV (lambda = 5.584e-05)
     ##
-    ##     branch        mse spectral_abscissa modal_rank loading_condition
-    ##  unbounded 0.00018312         -0.047677          3            2.2526
-    ##     stable 0.00018312         -0.047677          3            2.2526
+    ##     branch backend        mse spectral_abscissa modal_rank loading_condition
+    ##  unbounded    base 0.00018312         -0.047677          3            2.2526
+    ##     stable    base 0.00018312         -0.047677          3            2.2526
     ##  convergence evaluations
     ##            0           9
     ##            0          10

@@ -18,7 +18,7 @@
 #
 # The two data-generating systems reproduce the sparse p = 16, seed = 777 and
 # p = 15, seed = 888 constructions in ODE.eigen.bound.Rmd. Each system matrix is
-# held fixed within a design cell while initial conditions and errors vary.
+# held fixed within a design condition while initial conditions and errors vary.
 
 .simulation_env_integer <- function(name, default, lower = 1L) {
   value <- Sys.getenv(name, unset = as.character(default))

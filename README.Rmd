@@ -17,6 +17,11 @@ gradient-matching initialization, and profiled nonlinear least squares in a
 real modal basis. The package returns unconstrained, Wald-screened, and
 stability-constrained fits together with diagnostics and forecasting methods.
 
+The data are conventional time-domain trajectories: each row of the main
+interface is an ordered observation time and each column is a system state.
+AdaStableNet does not treat observations as biological cells and does not infer
+or use pseudotime.
+
 ## Installation
 
 ```r
