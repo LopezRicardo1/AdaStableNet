@@ -18,6 +18,7 @@
 #' @param wald_critical Absolute normal critical value.
 #' @param eigen_bound Fit a stability-constrained branch.
 #' @param stability_margin Upper bound for active modal real parts.
+#' @param backend Optimization backend: base R, Torch, or automatic selection.
 #' @param optimizer Optimization method passed to [stats::optim()].
 #' @param num_iter Maximum optimizer iterations per start.
 #' @param tol Relative optimization tolerance.
@@ -28,7 +29,13 @@
 #' @param seed Optional seed for optimization starts.
 #' @param wald_nsteps Integration intervals for approximate Wald variances.
 #' @param variance_ridge Ridge multiplier for Fisher-information inversion.
-#' @param lr Deprecated compatibility argument; ignored by the base-R backend.
+#' @param lr Learning rate for the Torch Adam optimizer; ignored by base R.
+#'   `NULL` uses `0.01`.
+#' @param torch_device Torch device: automatic CUDA selection, CPU, or CUDA.
+#' @param torch_refine Refine the Adam solution with Torch L-BFGS.
+#' @param torch_refine_iter Maximum L-BFGS refinement iterations.
+#' @param torch_patience Consecutive small relative-loss changes required for
+#'   Adam convergence.
 #' @param verbose Print concise progress messages.
 #'
 #' @return An object of class `adastablenet_fit`.
@@ -47,11 +54,15 @@ FitAdaStableNet <- function(Y, tt, nbasis = 25,
                             fit_ode2fd = TRUE, complex_pairs = NULL,
                             eigen_real_wald = TRUE, wald_critical = 2,
                             eigen_bound = TRUE, stability_margin = 0,
+                            backend = c("base", "torch", "auto"),
                             optimizer = "BFGS", num_iter = 1000L,
                             tol = 1e-8, ridge.pen = 1e-3,
                             n_starts = 1L, start_jitter = 0.05,
                             seed = NULL, wald_nsteps = 20L,
                             variance_ridge = 1e-6, lr = NULL,
+                            torch_device = c("auto", "cpu", "cuda"),
+                            torch_refine = TRUE, torch_refine_iter = 20L,
+                            torch_patience = 5L,
                             verbose = TRUE) {
   tt <- .validate_time(tt)
   Y <- .validate_data(Y, tt, "time_by_state")
@@ -83,6 +94,7 @@ FitAdaStableNet <- function(Y, tt, nbasis = 25,
     wald_critical = wald_critical,
     eigen_bound = eigen_bound,
     stability_margin = stability_margin,
+    backend = backend,
     optimizer = optimizer,
     num_iter = num_iter,
     tol = tol,
@@ -93,6 +105,10 @@ FitAdaStableNet <- function(Y, tt, nbasis = 25,
     wald_nsteps = wald_nsteps,
     variance_ridge = variance_ridge,
     lr = lr,
+    torch_device = torch_device,
+    torch_refine = torch_refine,
+    torch_refine_iter = torch_refine_iter,
+    torch_patience = torch_patience,
     verbose = verbose
   )
   selected <- if (!is.null(stages$Eigen_Bound)) {
@@ -120,12 +136,19 @@ FitAdaStableNet <- function(Y, tt, nbasis = 25,
       eigen_real_wald = eigen_real_wald,
       eigen_bound = eigen_bound,
       stability_margin = stability_margin,
+      backend_requested = stages$control$backend_requested,
+      backend = stages$control$backend,
       optimizer = optimizer,
       num_iter = num_iter,
       tol = tol,
       ridge.pen = ridge.pen,
       n_starts = n_starts,
-      seed = seed
+      seed = seed,
+      lr = stages$control$lr,
+      torch_device = stages$control$torch_device,
+      torch_refine = stages$control$torch_refine,
+      torch_refine_iter = stages$control$torch_refine_iter,
+      torch_patience = stages$control$torch_patience
     )
   ), class = "adastablenet_fit")
 }

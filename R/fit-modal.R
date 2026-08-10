@@ -14,6 +14,9 @@
 #' @param eigen_bound Fit the stability-constrained branch.
 #' @param stability_margin Upper bound for active modal real parts. The default
 #'   zero enforces nonpositive real parts.
+#' @param backend Optimization backend. `"base"` uses [stats::optim()],
+#'   `"torch"` uses float64 automatic differentiation, and `"auto"` selects
+#'   Torch when its runtime is available and otherwise uses base R.
 #' @param optimizer Optimization method passed to [stats::optim()].
 #' @param num_iter Maximum iterations per optimization start.
 #' @param tol Relative optimization tolerance.
@@ -24,8 +27,13 @@
 #' @param seed Optional seed for optimization starts.
 #' @param wald_nsteps Integration intervals for approximate Wald variances.
 #' @param variance_ridge Ridge multiplier for Fisher-information inversion.
-#' @param lr Deprecated compatibility argument. The base-R optimizer does not
-#'   use a learning rate.
+#' @param lr Learning rate for the Torch Adam optimizer; ignored by base R.
+#'   `NULL` uses `0.01`.
+#' @param torch_device Torch device: automatic CUDA selection, CPU, or CUDA.
+#' @param torch_refine Refine the Adam solution with Torch L-BFGS.
+#' @param torch_refine_iter Maximum L-BFGS refinement iterations.
+#' @param torch_patience Consecutive small relative-loss changes required for
+#'   Adam convergence.
 #' @param verbose Print concise progress messages.
 #'
 #' @return A list with `Unbounded`, `Wald_Real`, and `Eigen_Bound` model stages.
@@ -33,11 +41,14 @@
 AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
                          eigen_real_wald = TRUE, wald_critical = 2,
                          eigen_bound = TRUE, stability_margin = 0,
+                         backend = c("base", "torch", "auto"),
                          optimizer = "BFGS", num_iter = 1000L, tol = 1e-8,
                          ridge.pen = 1e-3, n_starts = 1L,
                          start_jitter = 0.05, seed = NULL,
                          wald_nsteps = 20L, variance_ridge = 1e-6,
-                         lr = NULL, verbose = TRUE) {
+                         lr = NULL, torch_device = c("auto", "cpu", "cuda"),
+                         torch_refine = TRUE, torch_refine_iter = 20L,
+                         torch_patience = 5L, verbose = TRUE) {
   tt <- .validate_time(tt)
   Y <- .validate_data(Y, tt, "state_by_time")
   initial_a <- as.numeric(initial_a)
@@ -71,6 +82,19 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
   .validate_scalar(start_jitter, "start_jitter", lower = 0)
   .validate_scalar(wald_nsteps, "wald_nsteps", lower = 2, integer = TRUE)
   .validate_scalar(variance_ridge, "variance_ridge", lower = 0)
+  backend_requested <- match.arg(backend)
+  backend <- .resolve_optimizer_backend(backend_requested)
+  torch_device <- match.arg(torch_device)
+  learning_rate <- lr %||% 0.01
+  .validate_scalar(learning_rate, "lr", lower = 0, lower_open = TRUE)
+  if (!is.logical(torch_refine) || length(torch_refine) != 1L ||
+      is.na(torch_refine)) {
+    stop("`torch_refine` must be TRUE or FALSE.", call. = FALSE)
+  }
+  .validate_scalar(torch_refine_iter, "torch_refine_iter", lower = 0,
+                   integer = TRUE)
+  .validate_scalar(torch_patience, "torch_patience", lower = 1,
+                   integer = TRUE)
   if (!optimizer %in% c("BFGS", "Nelder-Mead", "CG")) {
     stop("`optimizer` must be one of 'BFGS', 'Nelder-Mead', or 'CG'.",
          call. = FALSE)
@@ -82,7 +106,11 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
     Y = Y, tt = relative_time, ridge.pen = ridge.pen,
     optimizer = optimizer, num_iter = num_iter, tol = tol,
     n_starts = n_starts, start_jitter = start_jitter,
-    seed = seed, verbose = verbose
+    seed = seed, verbose = verbose,
+    backend = backend, lr = learning_rate,
+    torch_device = torch_device, torch_refine = torch_refine,
+    torch_refine_iter = torch_refine_iter,
+    torch_patience = torch_patience
   )
 
   if (verbose) message("Fitting the unconstrained modal model.")
@@ -175,6 +203,8 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
       wald_critical = wald_critical,
       eigen_bound = eigen_bound,
       stability_margin = stability_margin,
+      backend_requested = backend_requested,
+      backend = backend,
       optimizer = optimizer,
       num_iter = num_iter,
       tol = tol,
@@ -182,7 +212,11 @@ AdaStableNet <- function(Y, tt, initial_a, initial_b, initial_cc = NULL,
       n_starts = n_starts,
       start_jitter = start_jitter,
       seed = seed,
-      lr = lr
+      lr = learning_rate,
+      torch_device = torch_device,
+      torch_refine = torch_refine,
+      torch_refine_iter = torch_refine_iter,
+      torch_patience = torch_patience
     )
   ), class = "adastablenet_stages")
 }

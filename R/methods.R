@@ -4,6 +4,7 @@ print.adastablenet_fit <- function(x, ...) {
   cat("AdaStableNet fit\n")
   cat("  States: ", ncol(x$data), "\n", sep = "")
   cat("  Time points: ", nrow(x$data), "\n", sep = "")
+  cat("  Backend: ", stage$diagnostics$backend %||% "base", "\n", sep = "")
   cat("  Selected branch: ", x$selected_branch, "\n", sep = "")
   cat("  Training MSE: ", format(stage$diagnostics$loss, digits = 5),
       "\n", sep = "")
@@ -28,6 +29,7 @@ summary.adastablenet_fit <- function(object, ...) {
     if (is.null(stage)) return(NULL)
     data.frame(
       branch = name,
+      backend = stage$diagnostics$backend %||% "base",
       mse = stage$diagnostics$loss,
       spectral_abscissa = stage$diagnostics$spectral_abscissa,
       modal_rank = stage$diagnostics$modal_rank,

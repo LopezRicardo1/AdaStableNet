@@ -14,6 +14,7 @@ AdaStableNet(
   wald_critical = 2,
   eigen_bound = TRUE,
   stability_margin = 0,
+  backend = c("base", "torch", "auto"),
   optimizer = "BFGS",
   num_iter = 1000L,
   tol = 1e-08,
@@ -24,6 +25,10 @@ AdaStableNet(
   wald_nsteps = 20L,
   variance_ridge = 1e-06,
   lr = NULL,
+  torch_device = c("auto", "cpu", "cuda"),
+  torch_refine = TRUE,
+  torch_refine_iter = 20L,
+  torch_patience = 5L,
   verbose = TRUE
 )
 }
@@ -47,6 +52,10 @@ AdaStableNet(
 \item{stability_margin}{Upper bound for active modal real parts. The default
 zero enforces nonpositive real parts.}
 
+\item{backend}{Optimization backend. \code{"base"} uses \code{\link[stats:optim]{stats::optim()}},
+\code{"torch"} uses float64 automatic differentiation, and \code{"auto"} selects
+Torch when its runtime is available and otherwise uses base R.}
+
 \item{optimizer}{Optimization method passed to \code{\link[stats:optim]{stats::optim()}}.}
 
 \item{num_iter}{Maximum iterations per optimization start.}
@@ -66,8 +75,17 @@ start.}
 
 \item{variance_ridge}{Ridge multiplier for Fisher-information inversion.}
 
-\item{lr}{Deprecated compatibility argument. The base-R optimizer does not
-use a learning rate.}
+\item{lr}{Learning rate for the Torch Adam optimizer; ignored by base R.
+\code{NULL} uses \code{0.01}.}
+
+\item{torch_device}{Torch device: automatic CUDA selection, CPU, or CUDA.}
+
+\item{torch_refine}{Refine the Adam solution with Torch L-BFGS.}
+
+\item{torch_refine_iter}{Maximum L-BFGS refinement iterations.}
+
+\item{torch_patience}{Consecutive small relative-loss changes required for
+Adam convergence.}
 
 \item{verbose}{Print concise progress messages.}
 }

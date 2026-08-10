@@ -46,13 +46,13 @@
   c(theta_a, theta_b, theta_cc)
 }
 
-.fit_modal_stage <- function(Y, tt, a, b, cc = NULL,
-                             a_mask = NULL, cc_mask = NULL,
-                             stable = FALSE, stability_margin = 0,
-                             ridge.pen = 1e-3, optimizer = "BFGS",
-                             num_iter = 1000L, tol = 1e-8,
-                             n_starts = 1L, start_jitter = 0.05,
-                             seed = NULL, verbose = FALSE) {
+.fit_modal_stage_base <- function(Y, tt, a, b, cc = NULL,
+                                  a_mask = NULL, cc_mask = NULL,
+                                  stable = FALSE, stability_margin = 0,
+                                  ridge.pen = 1e-3, optimizer = "BFGS",
+                                  num_iter = 1000L, tol = 1e-8,
+                                  n_starts = 1L, start_jitter = 0.05,
+                                  seed = NULL, verbose = FALSE, ...) {
   cc <- if (is.null(cc)) numeric() else as.numeric(cc)
   q <- length(a)
   r <- length(cc)
@@ -119,10 +119,15 @@
     a_mask = a_mask,
     cc_mask = if (r) cc_mask else NULL,
     diagnostics = list(
+      backend = "base",
       optimizer = optimizer,
+      device = "cpu",
+      dtype = "double",
+      gradient = "finite_difference",
       convergence = best$convergence,
       message = best$message %||% "",
       counts = best$counts,
+      optimizer_loss = best$value,
       loss = best$value,
       loss_history = best$loss_history,
       selected_start = best$start_id,
@@ -131,4 +136,36 @@
       stability_margin = stability_margin
     )
   )
+}
+
+.fit_modal_stage <- function(Y, tt, a, b, cc = NULL,
+                             a_mask = NULL, cc_mask = NULL,
+                             stable = FALSE, stability_margin = 0,
+                             ridge.pen = 1e-3, optimizer = "BFGS",
+                             num_iter = 1000L, tol = 1e-8,
+                             n_starts = 1L, start_jitter = 0.05,
+                             seed = NULL, verbose = FALSE,
+                             backend = "base", lr = 0.01,
+                             torch_device = "auto", torch_refine = TRUE,
+                             torch_refine_iter = 20L,
+                             torch_patience = 5L) {
+  arguments <- list(
+    Y = Y, tt = tt, a = a, b = b, cc = cc,
+    a_mask = a_mask, cc_mask = cc_mask,
+    stable = stable, stability_margin = stability_margin,
+    ridge.pen = ridge.pen, optimizer = optimizer,
+    num_iter = num_iter, tol = tol,
+    n_starts = n_starts, start_jitter = start_jitter,
+    seed = seed, verbose = verbose
+  )
+  if (identical(backend, "torch")) {
+    return(do.call(.fit_modal_stage_torch, c(arguments, list(
+      lr = lr,
+      torch_device = torch_device,
+      torch_refine = torch_refine,
+      torch_refine_iter = torch_refine_iter,
+      torch_patience = torch_patience
+    ))))
+  }
+  do.call(.fit_modal_stage_base, arguments)
 }

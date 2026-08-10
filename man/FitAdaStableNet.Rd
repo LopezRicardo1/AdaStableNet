@@ -17,6 +17,7 @@ FitAdaStableNet(
   wald_critical = 2,
   eigen_bound = TRUE,
   stability_margin = 0,
+  backend = c("base", "torch", "auto"),
   optimizer = "BFGS",
   num_iter = 1000L,
   tol = 1e-08,
@@ -27,6 +28,10 @@ FitAdaStableNet(
   wald_nsteps = 20L,
   variance_ridge = 1e-06,
   lr = NULL,
+  torch_device = c("auto", "cpu", "cuda"),
+  torch_refine = TRUE,
+  torch_refine_iter = 20L,
+  torch_patience = 5L,
   verbose = TRUE
 )
 }
@@ -57,6 +62,8 @@ inferred from the real initial system matrix.}
 
 \item{stability_margin}{Upper bound for active modal real parts.}
 
+\item{backend}{Optimization backend: base R, Torch, or automatic selection.}
+
 \item{optimizer}{Optimization method passed to \code{\link[stats:optim]{stats::optim()}}.}
 
 \item{num_iter}{Maximum optimizer iterations per start.}
@@ -76,7 +83,17 @@ start.}
 
 \item{variance_ridge}{Ridge multiplier for Fisher-information inversion.}
 
-\item{lr}{Deprecated compatibility argument; ignored by the base-R backend.}
+\item{lr}{Learning rate for the Torch Adam optimizer; ignored by base R.
+\code{NULL} uses \code{0.01}.}
+
+\item{torch_device}{Torch device: automatic CUDA selection, CPU, or CUDA.}
+
+\item{torch_refine}{Refine the Adam solution with Torch L-BFGS.}
+
+\item{torch_refine_iter}{Maximum L-BFGS refinement iterations.}
+
+\item{torch_patience}{Consecutive small relative-loss changes required for
+Adam convergence.}
 
 \item{verbose}{Print concise progress messages.}
 }

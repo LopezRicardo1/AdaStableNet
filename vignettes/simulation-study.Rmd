@@ -130,6 +130,39 @@ fit <- FitAdaStableNet(
 summary(fit)
 ```
 
+## Optimization backends
+
+`backend = "base"` is the portable default and uses finite-difference BFGS
+through `optim()`. The optional `backend = "torch"` evaluates the same profiled
+modal loss with float64 tensors and automatic differentiation, optimizes with
+Adam, and can refine the best iterate with L-BFGS. Install it once with
+`install.packages("torch")` followed by `torch::install_torch()`.
+
+```{r torch-fit, eval=FALSE}
+fit_torch <- FitAdaStableNet(
+  Y = example_system$Y[train, ],
+  tt = example_system$time[train],
+  nbasis = 14,
+  backend = "torch",
+  torch_device = "auto", # CUDA when available, otherwise CPU
+  lr = 0.01,
+  torch_refine = TRUE,
+  torch_refine_iter = 20,
+  num_iter = 120,
+  seed = 101,
+  verbose = FALSE
+)
+
+fit_torch$control$backend
+fit_torch$AdaEigenStableNet$Eigen_Bound$diagnostics[
+  c("device", "dtype", "gradient")
+]
+```
+
+Use `backend = "auto"` to select Torch only when its package and runtime are
+available. The resolved backend, device, data type, convergence history, and
+gradient method are retained in the fit diagnostics for reproducibility.
+
 ```{r one-forecast, fig.cap="Noise-free trajectory and stable AdaStableNet forecast."}
 forecast <- predict(fit, example_system$time, branch = "stable")
 matplot(example_system$time, example_system$X, type = "l", lty = 1,
@@ -238,6 +271,7 @@ check can be launched with:
 Sys.setenv(
   ADASTABLENET_N_REP = 2,
   ADASTABLENET_NOISE_SD = "0.30",
+  ADASTABLENET_BACKEND = "base",
   ADASTABLENET_OUTPUT_DIR = file.path(
     getwd(), "adastablenet-simulation-results"
   )
@@ -261,6 +295,7 @@ following prespecified axes:
 | Observation times | 31, 61, 101 |
 | Noise SD | 0.05, 0.15, 0.30 |
 | Matrix structure | sparse (primary), dense (sensitivity analysis) |
+| Optimization backend | base, torch; report device and package version |
 | Sparse loading threshold | 0.25, 0.50, 0.65 |
 | Dense loading condition number | 1, 10, 50 |
 | Replications per retained cell | at least 500; 1000 for the main cells |
@@ -273,7 +308,8 @@ same input data and tuning protocol.
 Each result record should contain matrix error, matched eigenvalue error,
 spectral-abscissa error, stability classification, in-range trajectory error,
 future prediction error, convergence code, loading rank and condition number,
-proportions of structural zeros in (Q) and (A), and elapsed time.
+proportions of structural zeros in (Q) and (A), optimization backend and device,
+and elapsed time.
 Oracle-initial-state forecasts and estimated-initial-state forecasts answer
 different questions and must be reported separately.
 

@@ -15,8 +15,48 @@ test_that("low-level modal fitting returns stable full-rank outputs", {
   expect_s3_class(fit$Eigen_Bound, "adastablenet_stage")
   expect_equal(dim(fit$Eigen_Bound$A_hat), c(2, 2))
   expect_equal(dim(fit$Eigen_Bound$X_hat), c(2, 31))
+  expect_identical(fit$control$backend, "base")
+  expect_identical(fit$Unbounded$diagnostics$backend, "base")
   expect_true(fit$Eigen_Bound$diagnostics$full_modal_rank)
   expect_lte(fit$Eigen_Bound$diagnostics$spectral_abscissa, 1e-7)
+})
+
+test_that("Torch backend is reproducible and preserves the fit contract", {
+  skip_if_not(AdaStableNet:::.torch_backend_available())
+
+  sim <- simulate_adastablenet(p = 2, n_time = 31, sigma = 0.01, seed = 5)
+  modes <- sim$modal_parameters
+  arguments <- list(
+    Y = t(sim$Y), tt = sim$time,
+    initial_a = modes$a + 0.02,
+    initial_b = modes$b * 0.98,
+    initial_cc = modes$cc,
+    eigen_real_wald = FALSE,
+    lr = 0.02,
+    num_iter = 40,
+    torch_refine_iter = 5,
+    seed = 42,
+    verbose = FALSE
+  )
+  torch_fit <- do.call(AdaStableNet, c(arguments, list(
+    backend = "torch", torch_device = "cpu"
+  )))
+  auto_fit <- do.call(AdaStableNet, c(arguments, list(
+    backend = "auto", torch_device = "cpu"
+  )))
+
+  expect_identical(torch_fit$control$backend, "torch")
+  expect_identical(auto_fit$control$backend, "torch")
+  expect_identical(torch_fit$Unbounded$diagnostics$dtype, "float64")
+  expect_identical(torch_fit$Unbounded$diagnostics$gradient, "autograd")
+  expect_identical(torch_fit$Unbounded$diagnostics$device, "cpu")
+  expect_true(is.finite(torch_fit$Unbounded$diagnostics$loss))
+  expect_lte(torch_fit$Eigen_Bound$diagnostics$spectral_abscissa, 1e-7)
+  expect_equal(
+    torch_fit$Eigen_Bound$modal_parameters,
+    auto_fit$Eigen_Bound$modal_parameters,
+    tolerance = 1e-10
+  )
 })
 
 test_that("high-level fit supports standard model methods", {

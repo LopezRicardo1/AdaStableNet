@@ -1,3 +1,15 @@
+# AdaStableNet 0.3.0
+
+* Added optional `backend = "torch"` optimization with float64 autograd,
+  Adam, optional L-BFGS refinement, CPU/CUDA device selection, reproducible
+  starts, and the same fitted-object contract as the base-R backend.
+* Added `backend = "auto"` for Torch selection when both the R package and
+  LibTorch runtime are available. Torch remains an optional suggested package.
+* Extended the sourceable sparse simulation runner with backend, device,
+  learning-rate, refinement, and patience controls. Results record the resolved
+  backend, device, and Torch version, and checkpoints distinguish Torch tuning
+  configurations.
+
 # AdaStableNet 0.2.2
 
 * Added an installed, sourceable simulation-study runner with the canonical

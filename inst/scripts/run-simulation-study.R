@@ -9,6 +9,7 @@
 #   Sys.setenv(
 #     ADASTABLENET_N_REP = 500,
 #     ADASTABLENET_NOISE_SD = "0.05,0.15,0.30",
+#     ADASTABLENET_BACKEND = "torch",
 #     ADASTABLENET_OUTPUT_DIR = "AdaStableNet-paper-simulation"
 #   )
 #   source(system.file(
@@ -92,7 +93,9 @@
 }
 
 .simulation_summarize <- function(results) {
-  group_names <- c("scenario", "p", "spectrum", "sigma", "method")
+  group_names <- c(
+    "scenario", "p", "spectrum", "sigma", "backend", "device", "method"
+  )
   metric_names <- c(
     "A_relative_error", "matched_eigen_RMSE",
     "spectral_abscissa_error", "training_RMSE", "future_RMSE",
@@ -137,10 +140,13 @@
 
 .simulation_result_row <- function(scenario, sigma, replicate, method,
                                    simulation_seed, fit_seed, status,
+                                   backend, device,
+                                   torch_version = NA_character_,
                                    error_message = "", warnings = "") {
   data.frame(
     scenario = scenario$id, p = scenario$p, spectrum = scenario$spectrum,
     sigma = sigma, replicate = replicate, method = method,
+    backend = backend, device = device, torch_version = torch_version,
     simulation_seed = simulation_seed, fit_seed = fit_seed,
     status = status, error_message = error_message, warnings = warnings,
     A_relative_error = NA_real_, matched_eigen_RMSE = NA_real_,
@@ -167,14 +173,20 @@ run_adastablenet_simulation <- function(
     num_iter = 120L,
     wald_nsteps = 6L,
     n_starts = 1L,
+    backend = c("base", "torch", "auto"),
+    lr = 0.01,
+    torch_device = c("auto", "cpu", "cuda"),
+    torch_refine = TRUE,
+    torch_refine_iter = 20L,
+    torch_patience = 5L,
     support_tolerance = 1e-6,
     resume = TRUE,
     verbose = TRUE) {
   if (!requireNamespace("AdaStableNet", quietly = TRUE)) {
     stop("Install AdaStableNet before running the study.", call. = FALSE)
   }
-  if (utils::packageVersion("AdaStableNet") < numeric_version("0.2.1")) {
-    stop("AdaStableNet >= 0.2.1 is required for sparse simulation.",
+  if (utils::packageVersion("AdaStableNet") < numeric_version("0.3.0")) {
+    stop("AdaStableNet >= 0.3.0 is required for this simulation runner.",
          call. = FALSE)
   }
   if (!requireNamespace("expm", quietly = TRUE)) {
@@ -187,9 +199,21 @@ run_adastablenet_simulation <- function(
   num_iter <- as.integer(num_iter)
   wald_nsteps <- as.integer(wald_nsteps)
   n_starts <- as.integer(n_starts)
+  torch_refine_iter <- as.integer(torch_refine_iter)
+  torch_patience <- as.integer(torch_patience)
+  backend <- match.arg(backend)
+  torch_device <- match.arg(torch_device)
   if (n_rep < 1L || n_time < 21L || nbasis < 4L || num_iter < 1L ||
-      wald_nsteps < 1L || n_starts < 1L) {
+      wald_nsteps < 2L || n_starts < 1L || torch_refine_iter < 0L ||
+      torch_patience < 1L) {
     stop("Invalid simulation or fitting control value.", call. = FALSE)
+  }
+  if (length(lr) != 1L || !is.finite(lr) || lr <= 0) {
+    stop("`lr` must be positive and finite.", call. = FALSE)
+  }
+  if (!is.logical(torch_refine) || length(torch_refine) != 1L ||
+      is.na(torch_refine)) {
+    stop("`torch_refine` must be TRUE or FALSE.", call. = FALSE)
   }
   if (!length(noise_sd) || any(!is.finite(noise_sd)) || any(noise_sd < 0)) {
     stop("`noise_sd` must contain nonnegative finite values.", call. = FALSE)
@@ -216,7 +240,10 @@ run_adastablenet_simulation <- function(
     scenarios = scenarios, n_rep = n_rep, noise_sd = noise_sd,
     n_time = n_time, time_range = c(0, 2), training_range = c(0, 1),
     nbasis = nbasis, num_iter = num_iter, wald_nsteps = wald_nsteps,
-    n_starts = n_starts, support_tolerance = support_tolerance
+    n_starts = n_starts, backend = backend, lr = lr,
+    torch_device = torch_device, torch_refine = torch_refine,
+    torch_refine_iter = torch_refine_iter, torch_patience = torch_patience,
+    support_tolerance = support_tolerance
   )
   saveRDS(configuration, file.path(output_dir, "configuration.rds"))
 
@@ -296,8 +323,14 @@ run_adastablenet_simulation <- function(
 
       for (replicate in seq_len(n_rep)) {
         progress <- progress + 1L
-        key <- sprintf("%s|sigma=%.8g|rep=%06d",
-                       scenario$id, sigma, replicate)
+        key <- sprintf(
+          paste0(
+            "%s|sigma=%.8g|backend=%s|device=%s|lr=%.8g|",
+            "refine=%s|refine_iter=%d|patience=%d|rep=%06d"
+          ),
+          scenario$id, sigma, backend, torch_device, lr, torch_refine,
+          torch_refine_iter, torch_patience, replicate
+        )
         if (!is.null(completed[[key]])) {
           if (verbose) message("[", progress, "/", total, "] resumed ", key)
           next
@@ -319,6 +352,10 @@ run_adastablenet_simulation <- function(
               nbasis = min(nbasis, sum(train) - 2L),
               lambda_range = c(-14, 1), twoSE = FALSE,
               eigen_real_wald = TRUE, eigen_bound = TRUE,
+              backend = backend, lr = lr, torch_device = torch_device,
+              torch_refine = torch_refine,
+              torch_refine_iter = torch_refine_iter,
+              torch_patience = torch_patience,
               num_iter = num_iter, n_starts = n_starts,
               wald_nsteps = wald_nsteps, seed = fit_seed, verbose = FALSE
             ),
@@ -341,7 +378,9 @@ run_adastablenet_simulation <- function(
           completed[[key]] <- do.call(rbind, lapply(methods, function(method) {
             .simulation_result_row(
               scenario, sigma, replicate, method, scenario$seed, fit_seed,
-              status = "fit_error", error_message = fit_error,
+              status = "fit_error", backend = backend,
+              device = if (backend == "base") "cpu" else torch_device,
+              error_message = fit_error,
               warnings = warning_text
             )
           }))
@@ -363,7 +402,18 @@ run_adastablenet_simulation <- function(
           A_hat <- estimates[[method]]
           row <- .simulation_result_row(
             scenario, sigma, replicate, method, scenario$seed, fit_seed,
-            status = "ok", warnings = warning_text
+            status = "ok", backend = fit$control$backend,
+            device = if (method == "two_stage") {
+              "cpu"
+            } else {
+              fit$control$torch_device
+            },
+            torch_version = if (fit$control$backend == "torch") {
+              as.character(utils::packageVersion("torch"))
+            } else {
+              NA_character_
+            },
+            warnings = warning_text
           )
           prediction_error <- ""
           predicted <- tryCatch(
@@ -429,6 +479,12 @@ run_adastablenet_simulation <- function(
               stable = "Eigen_Bound"
             )
             diagnostics <- fit$AdaEigenStableNet[[stage_name]]$diagnostics
+            row$device <- diagnostics$device
+            row$torch_version <- if (is.null(diagnostics$torch_version)) {
+              NA_character_
+            } else {
+              diagnostics$torch_version
+            }
             row$convergence <- diagnostics$convergence
             row$modal_rank <- diagnostics$modal_rank
             row$loading_condition <- diagnostics$loading_condition
@@ -495,6 +551,18 @@ if (.simulation_env_flag("ADASTABLENET_AUTORUN", TRUE)) {
     num_iter = .simulation_env_integer("ADASTABLENET_NUM_ITER", 120L),
     wald_nsteps = .simulation_env_integer("ADASTABLENET_WALD_STEPS", 6L),
     n_starts = .simulation_env_integer("ADASTABLENET_N_STARTS", 1L),
+    backend = Sys.getenv("ADASTABLENET_BACKEND", unset = "base"),
+    lr = as.numeric(Sys.getenv("ADASTABLENET_TORCH_LR", unset = "0.01")),
+    torch_device = Sys.getenv(
+      "ADASTABLENET_TORCH_DEVICE", unset = "auto"
+    ),
+    torch_refine = .simulation_env_flag("ADASTABLENET_TORCH_REFINE", TRUE),
+    torch_refine_iter = .simulation_env_integer(
+      "ADASTABLENET_TORCH_REFINE_ITER", 20L, 0L
+    ),
+    torch_patience = .simulation_env_integer(
+      "ADASTABLENET_TORCH_PATIENCE", 5L, 1L
+    ),
     support_tolerance = as.numeric(Sys.getenv(
       "ADASTABLENET_EDGE_TOLERANCE", unset = "1e-6"
     )),
