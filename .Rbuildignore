@@ -3,5 +3,6 @@
 ^\.github$
 ^README\.Rmd$
 ^README\.html$
+^vignettes/simulation-study\.R$
 ^cran-comments\.md$
 ^revdep$

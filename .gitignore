@@ -7,4 +7,5 @@
 *.tar.gz
 vignettes/*.html
 vignettes/*.pdf
+vignettes/simulation-study.R
 README.html
