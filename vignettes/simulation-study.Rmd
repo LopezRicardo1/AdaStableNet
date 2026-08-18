@@ -321,3 +321,24 @@ For Wald inference, additional null and alternative conditions should report
 type-I error, power, interval coverage, false discovery rate, and edge-selection
 accuracy. Monte Carlo standard errors and paired method differences should
 accompany all summary tables.
+
+## Stability, coefficient inference, and identifiability
+
+The `stable` branch is the constrained optimization, not the coefficient Wald
+test. Its default constraint controls the spectral abscissa. Because spectral
+stability does not exclude transient growth for nonnormal matrices, use
+`stability_diagnostics()` to record the numerical abscissa and the maximum
+finite-horizon matrix-exponential norm.
+
+`AdaStableNet_WaldTest()` implements the coefficientwise tensor/integration
+calculation based on the total trajectory Fisher information of Wu et al.
+(2019). Apply it separately to the unbounded and constrained branches and
+evaluate false-positive rate, false-discovery proportion, power, and sign
+recovery. The usual normal reference is a working approximation for a
+boundary-constrained estimate.
+
+When `ode.ident` is installed, `identifiability_diagnostics(A, x0)` exposes the
+Qiu et al. initial-condition identifiability score (ICIS). A paper simulation
+should retain the full population of generated initial conditions and analyze
+performance by ICIS stratum; retaining only the largest ICIS values would
+optimistically select the easiest trajectories.

@@ -32,6 +32,7 @@ summary.adastablenet_fit <- function(object, ...) {
       backend = stage$diagnostics$backend %||% "base",
       mse = stage$diagnostics$loss,
       spectral_abscissa = stage$diagnostics$spectral_abscissa,
+      numerical_abscissa = stage$diagnostics$numerical_abscissa,
       modal_rank = stage$diagnostics$modal_rank,
       loading_condition = stage$diagnostics$loading_condition,
       convergence = stage$diagnostics$convergence %||% NA_integer_,
@@ -46,6 +47,48 @@ summary.adastablenet_fit <- function(object, ...) {
     selected_lambda = object$Ode2Stage$selected_lambda,
     smoothing_method = object$Ode2Stage$selection_method
   ), class = "summary.adastablenet_fit")
+}
+
+#' Stability Diagnostics for an AdaStableNet Fit
+#'
+#' Summarizes asymptotic spectral stability and finite-horizon transient
+#' amplification for one fitted branch. A nonpositive spectral abscissa rules
+#' out exponentially growing eigenmodes. It does not imply monotone decay of
+#' the Euclidean norm when the fitted matrix is nonnormal; the numerical
+#' abscissa and maximum matrix-exponential norm diagnose that distinction.
+#'
+#' @param object An `adastablenet_fit` or `adastablenet_stage` object.
+#' @param branch One of `"stable"`, `"wald"`, or `"unbounded"` when `object`
+#'   is a complete fit.
+#' @param horizon Nonnegative horizon over which transient amplification is
+#'   evaluated.
+#' @param n_grid Number of equally spaced evaluation times.
+#'
+#' @return A list containing the spectral abscissa, numerical abscissa,
+#'   stability indicators, and finite-horizon amplification curve.
+#' @export
+stability_diagnostics <- function(
+    object, branch = c("stable", "wald", "unbounded"),
+    horizon = 1, n_grid = 101L) {
+  stage <- if (inherits(object, "adastablenet_stage")) {
+    object
+  } else if (inherits(object, "adastablenet_fit")) {
+    .resolve_branch(object, branch)
+  } else {
+    stop("`object` must be an AdaStableNet fit or fitted stage.",
+         call. = FALSE)
+  }
+  transient <- .transient_growth(stage$A_hat, horizon, n_grid)
+  spectral <- .spectral_abscissa(stage$A_hat)
+  numerical <- .numerical_abscissa(stage$A_hat)
+  structure(list(
+    branch = if (inherits(object, "adastablenet_fit")) match.arg(branch) else NA_character_,
+    spectral_abscissa = spectral,
+    numerical_abscissa = numerical,
+    spectrally_stable = spectral <= 0,
+    euclidean_dissipative = numerical <= 0,
+    transient = transient
+  ), class = "adastablenet_stability_diagnostics")
 }
 
 #' @export

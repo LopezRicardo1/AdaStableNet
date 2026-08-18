@@ -92,6 +92,45 @@
   )
 }
 
+.simulation_identifiability <- function(A, x0) {
+  if (!requireNamespace("ode.ident", quietly = TRUE)) {
+    return(c(identifiable = NA_real_, ICIS = NA_real_,
+             minimum_eigenvalue_gap = NA_real_))
+  }
+  result <- AdaStableNet::identifiability_diagnostics(A, x0, n.digits = 6L)
+  c(
+    identifiable = as.numeric(result$identifiable),
+    ICIS = result$ICIS,
+    minimum_eigenvalue_gap = result$minimum_eigenvalue_gap
+  )
+}
+
+.simulation_wald_metrics <- function(fit, Y, tt, truth, alpha,
+                                     method, nsteps, variance_ridge) {
+  p_values <- AdaStableNet::AdaStableNet_WaldTest(
+    fit, Y, tt, method = method, alpha = alpha, return = "pvals",
+    nsteps = nsteps, variance_ridge = variance_ridge
+  )
+  selected <- is.finite(p_values) & p_values <= alpha
+  true_edge <- abs(truth) >= 1e-12
+  null_edge <- !true_edge
+  tp <- sum(selected & true_edge)
+  fp <- sum(selected & null_edge)
+  tn <- sum(!selected & null_edge)
+  fn <- sum(!selected & true_edge)
+  c(
+    wald_discovery_count = sum(selected),
+    wald_true_positive_rate = if (tp + fn) tp / (tp + fn) else NA_real_,
+    wald_false_positive_rate = if (fp + tn) fp / (fp + tn) else NA_real_,
+    wald_false_discovery_proportion = if (tp + fp) fp / (tp + fp) else 0,
+    wald_sign_accuracy = if (tp) {
+      mean(sign(fit$A_hat[selected & true_edge]) == sign(truth[selected & true_edge]))
+    } else {
+      NA_real_
+    }
+  )
+}
+
 .simulation_summarize <- function(results) {
   group_names <- c(
     "scenario", "p", "spectrum", "sigma", "backend", "device", "method"
@@ -100,7 +139,9 @@
     "A_relative_error", "matched_eigen_RMSE",
     "spectral_abscissa_error", "training_RMSE", "future_RMSE",
     "future_RMSE_oracle_x0", "true_positive_rate", "false_positive_rate",
-    "precision", "F1"
+    "precision", "F1", "numerical_abscissa", "transient_amplification",
+    "wald_true_positive_rate", "wald_false_positive_rate",
+    "wald_false_discovery_proportion", "wald_sign_accuracy"
   )
   groups <- split(
     results,
@@ -154,10 +195,17 @@
     spectral_abscissa_estimate = NA_real_,
     spectral_abscissa_error = NA_real_, stable_truth = NA,
     stable_estimate = NA, stability_correct = NA,
+    numerical_abscissa = NA_real_, transient_amplification = NA_real_,
+    identifiable = NA, ICIS = NA_real_, identifiability_stratum = NA_character_,
+    minimum_eigenvalue_gap = NA_real_,
     training_RMSE = NA_real_, future_RMSE = NA_real_,
     future_RMSE_oracle_x0 = NA_real_, Ahat_sparsity = NA_real_,
     true_positive_rate = NA_real_, false_positive_rate = NA_real_,
     precision = NA_real_, F1 = NA_real_, convergence = NA_integer_,
+    wald_discovery_count = NA_integer_, wald_true_positive_rate = NA_real_,
+    wald_false_positive_rate = NA_real_,
+    wald_false_discovery_proportion = NA_real_,
+    wald_sign_accuracy = NA_real_,
     modal_rank = NA_integer_, loading_condition = NA_real_,
     fit_elapsed_seconds = NA_real_, stringsAsFactors = FALSE
   )
@@ -180,13 +228,20 @@ run_adastablenet_simulation <- function(
     torch_refine_iter = 20L,
     torch_patience = 5L,
     support_tolerance = 1e-6,
+    transient_horizon = 2,
+    transient_n_grid = 101L,
+    coefficient_wald = TRUE,
+    coefficient_wald_alpha = 0.05,
+    coefficient_wald_method = "BH",
+    coefficient_wald_branches = c("unbounded", "stable"),
+    variance_ridge = 1e-6,
     resume = TRUE,
     verbose = TRUE) {
   if (!requireNamespace("AdaStableNet", quietly = TRUE)) {
     stop("Install AdaStableNet before running the study.", call. = FALSE)
   }
-  if (utils::packageVersion("AdaStableNet") < numeric_version("0.3.0")) {
-    stop("AdaStableNet >= 0.3.0 is required for this simulation runner.",
+  if (utils::packageVersion("AdaStableNet") < numeric_version("0.3.1")) {
+    stop("AdaStableNet >= 0.3.1 is required for this simulation runner.",
          call. = FALSE)
   }
   if (!requireNamespace("expm", quietly = TRUE)) {
@@ -201,24 +256,63 @@ run_adastablenet_simulation <- function(
   n_starts <- as.integer(n_starts)
   torch_refine_iter <- as.integer(torch_refine_iter)
   torch_patience <- as.integer(torch_patience)
+  transient_n_grid <- as.integer(transient_n_grid)
   backend <- match.arg(backend)
   torch_device <- match.arg(torch_device)
-  if (n_rep < 1L || n_time < 21L || nbasis < 4L || num_iter < 1L ||
+  integer_inputs <- list(
+    n_rep = n_rep, n_time = n_time, nbasis = nbasis,
+    num_iter = num_iter, wald_nsteps = wald_nsteps,
+    n_starts = n_starts, torch_refine_iter = torch_refine_iter,
+    torch_patience = torch_patience, transient_n_grid = transient_n_grid
+  )
+  integer_controls <- c(
+    n_rep, n_time, nbasis, num_iter, wald_nsteps, n_starts,
+    torch_refine_iter, torch_patience, transient_n_grid
+  )
+  if (any(lengths(integer_inputs) != 1L) || anyNA(integer_controls) ||
+      n_rep < 1L || n_time < 21L || nbasis < 4L || num_iter < 1L ||
       wald_nsteps < 2L || n_starts < 1L || torch_refine_iter < 0L ||
-      torch_patience < 1L) {
+      torch_patience < 1L || transient_n_grid < 2L) {
     stop("Invalid simulation or fitting control value.", call. = FALSE)
   }
-  if (length(lr) != 1L || !is.finite(lr) || lr <= 0) {
+  if (!is.logical(coefficient_wald) || length(coefficient_wald) != 1L ||
+      is.na(coefficient_wald)) {
+    stop("`coefficient_wald` must be TRUE or FALSE.", call. = FALSE)
+  }
+  if (length(coefficient_wald_method) != 1L ||
+      !is.character(coefficient_wald_method) ||
+      !coefficient_wald_method %in% stats::p.adjust.methods) {
+    stop("`coefficient_wald_method` is not recognized by `p.adjust()`.",
+         call. = FALSE)
+  }
+  coefficient_wald_branches <- unique(as.character(coefficient_wald_branches))
+  if (any(!coefficient_wald_branches %in% c("unbounded", "wald", "stable"))) {
+    stop("`coefficient_wald_branches` contains an unknown fitted branch.",
+         call. = FALSE)
+  }
+  scalar_controls <- c(
+    coefficient_wald_alpha, transient_horizon, variance_ridge
+  )
+  if (length(coefficient_wald_alpha) != 1L ||
+      length(transient_horizon) != 1L || length(variance_ridge) != 1L ||
+      !is.numeric(scalar_controls) || any(!is.finite(scalar_controls)) ||
+      coefficient_wald_alpha <= 0 || coefficient_wald_alpha >= 1 ||
+      transient_horizon < 0 || variance_ridge < 0) {
+    stop("Invalid stability or coefficient-Wald control value.", call. = FALSE)
+  }
+  if (length(lr) != 1L || !is.numeric(lr) || !is.finite(lr) || lr <= 0) {
     stop("`lr` must be positive and finite.", call. = FALSE)
   }
   if (!is.logical(torch_refine) || length(torch_refine) != 1L ||
       is.na(torch_refine)) {
     stop("`torch_refine` must be TRUE or FALSE.", call. = FALSE)
   }
-  if (!length(noise_sd) || any(!is.finite(noise_sd)) || any(noise_sd < 0)) {
+  if (!is.numeric(noise_sd) || !length(noise_sd) ||
+      any(!is.finite(noise_sd)) || any(noise_sd < 0)) {
     stop("`noise_sd` must contain nonnegative finite values.", call. = FALSE)
   }
-  if (length(support_tolerance) != 1L || !is.finite(support_tolerance) ||
+  if (length(support_tolerance) != 1L || !is.numeric(support_tolerance) ||
+      !is.finite(support_tolerance) ||
       support_tolerance <= 0) {
     stop("`support_tolerance` must be positive and finite.", call. = FALSE)
   }
@@ -235,7 +329,9 @@ run_adastablenet_simulation <- function(
     p = c(16L, 15L), spectrum = c("marginal", "mixed"),
     seed = c(777L, 888L), stringsAsFactors = FALSE
   )
+  checkpoint_schema <- 3L
   configuration <- list(
+    checkpoint_schema = checkpoint_schema,
     package_version = as.character(utils::packageVersion("AdaStableNet")),
     scenarios = scenarios, n_rep = n_rep, noise_sd = noise_sd,
     n_time = n_time, time_range = c(0, 2), training_range = c(0, 1),
@@ -243,17 +339,44 @@ run_adastablenet_simulation <- function(
     n_starts = n_starts, backend = backend, lr = lr,
     torch_device = torch_device, torch_refine = torch_refine,
     torch_refine_iter = torch_refine_iter, torch_patience = torch_patience,
-    support_tolerance = support_tolerance
+    support_tolerance = support_tolerance,
+    transient_horizon = transient_horizon,
+    transient_n_grid = transient_n_grid,
+    coefficient_wald = coefficient_wald,
+    coefficient_wald_alpha = coefficient_wald_alpha,
+    coefficient_wald_method = coefficient_wald_method,
+    coefficient_wald_branches = coefficient_wald_branches,
+    variance_ridge = variance_ridge
   )
   saveRDS(configuration, file.path(output_dir, "configuration.rds"))
 
-  completed <- if (resume && file.exists(checkpoint_path)) {
-    readRDS(checkpoint_path)
-  } else {
-    list()
+  completed <- list()
+  if (resume && file.exists(checkpoint_path)) {
+    checkpoint <- tryCatch(readRDS(checkpoint_path), error = function(e) NULL)
+    compatible <- is.list(checkpoint) &&
+      identical(checkpoint$schema, checkpoint_schema) &&
+      identical(checkpoint$configuration, configuration) &&
+      is.list(checkpoint$completed)
+    if (compatible) {
+      completed <- checkpoint$completed
+    } else if (verbose) {
+      message(
+        "Ignoring an incompatible checkpoint and starting this configuration ",
+        "from the beginning. Existing result files will be replaced only ",
+        "after the run completes."
+      )
+    }
   }
-  if (!is.list(completed)) {
-    stop("The checkpoint is not a valid result list.", call. = FALSE)
+
+  save_checkpoint <- function() {
+    saveRDS(
+      list(
+        schema = checkpoint_schema,
+        configuration = configuration,
+        completed = completed
+      ),
+      checkpoint_path
+    )
   }
 
   system_diagnostics <- list()
@@ -325,7 +448,7 @@ run_adastablenet_simulation <- function(
         progress <- progress + 1L
         key <- sprintf(
           paste0(
-            "%s|sigma=%.8g|backend=%s|device=%s|lr=%.8g|",
+            "analysis=v2|%s|sigma=%.8g|backend=%s|device=%s|lr=%.8g|",
             "refine=%s|refine_iter=%d|patience=%d|rep=%06d"
           ),
           scenario$id, sigma, backend, torch_device, lr, torch_refine,
@@ -339,6 +462,7 @@ run_adastablenet_simulation <- function(
 
         observed <- Y[, , replicate, drop = TRUE]
         truth <- X[, , replicate, drop = TRUE]
+        identifiability <- .simulation_identifiability(sim$A, truth[1L, ])
         fit_seed <- as.integer(
           scenario$seed + 100000L + noise_index * 10000L + replicate
         )
@@ -384,7 +508,7 @@ run_adastablenet_simulation <- function(
               warnings = warning_text
             )
           }))
-          saveRDS(completed, checkpoint_path)
+          save_checkpoint()
           next
         }
 
@@ -453,6 +577,20 @@ run_adastablenet_simulation <- function(
           row$stable_truth <- truth_abscissa <= 1e-7
           row$stable_estimate <- estimate_abscissa <= 1e-7
           row$stability_correct <- row$stable_truth == row$stable_estimate
+          stability <- AdaStableNet::stability_diagnostics(
+            structure(list(A_hat = A_hat), class = "adastablenet_stage"),
+            horizon = transient_horizon, n_grid = transient_n_grid
+          )
+          row$numerical_abscissa <- stability$numerical_abscissa
+          row$transient_amplification <- stability$transient$maximum
+          row$identifiable <- as.logical(identifiability[["identifiable"]])
+          row$ICIS <- identifiability[["ICIS"]]
+          row$minimum_eigenvalue_gap <- identifiability[["minimum_eigenvalue_gap"]]
+          row$identifiability_stratum <- if (is.finite(row$ICIS)) {
+            if (row$ICIS < 0.20) "low" else if (row$ICIS < 0.60) "medium" else "high"
+          } else {
+            NA_character_
+          }
           row$training_RMSE <- sqrt(mean(
             (predicted[train, , drop = FALSE] - truth[train, , drop = FALSE])^2
           ))
@@ -488,12 +626,31 @@ run_adastablenet_simulation <- function(
             row$convergence <- diagnostics$convergence
             row$modal_rank <- diagnostics$modal_rank
             row$loading_condition <- diagnostics$loading_condition
+            if (coefficient_wald && method %in% coefficient_wald_branches) {
+              stage <- fit$AdaEigenStableNet[[stage_name]]
+              wald_metrics <- tryCatch(
+                .simulation_wald_metrics(
+                  stage, observed[train, , drop = FALSE], sim$time[train],
+                  sim$A, coefficient_wald_alpha, coefficient_wald_method,
+                  wald_nsteps, variance_ridge
+                ),
+                error = function(e) rep(NA_real_, 5L)
+              )
+              if (is.null(names(wald_metrics))) {
+                names(wald_metrics) <- c(
+                  "wald_discovery_count", "wald_true_positive_rate",
+                  "wald_false_positive_rate",
+                  "wald_false_discovery_proportion", "wald_sign_accuracy"
+                )
+              }
+              for (metric in names(wald_metrics)) row[[metric]] <- wald_metrics[[metric]]
+            }
           }
           rows[[method]] <- row
         }
         completed[[key]] <- do.call(rbind, rows)
         rownames(completed[[key]]) <- NULL
-        saveRDS(completed, checkpoint_path)
+        save_checkpoint()
       }
     }
   }

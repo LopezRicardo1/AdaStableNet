@@ -1,9 +1,13 @@
 #' Coefficientwise Wald Tests for an AdaStableNet Fit
 #'
-#' Computes approximate coefficientwise Wald statistics for the entries of the
-#' fitted system matrix and optionally applies a multiple-testing correction.
-#' These tests condition on the fitted initial state and should be treated as
-#' large-sample approximations.
+#' Computes coefficientwise Wald statistics for the entries of the fitted
+#' system matrix using the trajectory-sensitivity tensor and total Fisher
+#' information developed for matrix-based linear ODE estimation by Wu et al.
+#' (2019), and optionally applies a multiple-testing correction. The current
+#' plug-in implementation conditions on the fitted initial state. For a
+#' stability-constrained estimate on the boundary, its ordinary normal
+#' reference distribution remains a working approximation and should be
+#' calibrated by simulation.
 #'
 #' @param fit An `adastablenet_stage` object or a stage extracted from a fitted
 #'   model.
@@ -16,6 +20,10 @@
 #' @param variance_ridge Fisher-information ridge multiplier.
 #'
 #' @return A numeric matrix.
+#' @references Wu, L., Qiu, X., Yuan, Y.-X., and Wu, H. (2019).
+#'   Parameter estimation and variable selection for big systems of linear
+#'   ordinary differential equations: A matrix-based approach. *Journal of the
+#'   American Statistical Association*, 114(526), 657-667.
 #' @importFrom stats p.adjust pnorm
 #' @export
 AdaStableNet_WaldTest <- function(fit, Y, tt, method = "BH", alpha = 0.05,

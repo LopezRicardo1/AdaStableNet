@@ -89,6 +89,28 @@
   max(Re(eigen(A, only.values = TRUE)$values))
 }
 
+.numerical_abscissa <- function(A) {
+  max(eigen((A + t(A)) / 2, symmetric = TRUE, only.values = TRUE)$values)
+}
+
+.transient_growth <- function(A, horizon = 1, n_grid = 101L) {
+  .validate_scalar(horizon, "horizon", lower = 0)
+  .validate_scalar(n_grid, "n_grid", lower = 2, integer = TRUE)
+  grid <- seq(0, horizon, length.out = as.integer(n_grid))
+  norms <- vapply(grid, function(time) {
+    values <- svd(expm::expm(time * A), nu = 0L, nv = 0L)$d
+    if (length(values)) max(values) else NA_real_
+  }, numeric(1L))
+  maximum <- max(norms, na.rm = TRUE)
+  list(
+    horizon = horizon,
+    time = grid,
+    norm = norms,
+    maximum = maximum,
+    time_of_maximum = grid[which.max(norms)]
+  )
+}
+
 .relative_frobenius <- function(estimate, truth) {
   denominator <- sqrt(sum(truth^2))
   if (denominator == 0) {

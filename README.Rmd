@@ -87,9 +87,30 @@ head(future)
 ## Model branches
 
 - `unbounded` estimates modal real parts without a sign constraint.
-- `wald` sets modal real parts that are not distinguishable from zero to zero.
+- `wald` applies a modal Wald screen and sets real parts that are not
+  distinguishable from zero to zero.
 - `stable` constrains retained real parts to lie below `stability_margin`, which
-  is zero by default.
+  is zero by default. This is the stability-constrained optimization branch.
+
+The three ideas should not be conflated. `AdaStableNet_WaldTest()` performs the
+Wu et al. (2019) trajectory-sensitivity Wald test for individual entries of
+the coefficient matrix. The `wald` branch instead screens modal real parts,
+and the `stable` branch imposes the spectral constraint.
+
+With the default margin, `stable` guarantees a nonpositive realized spectral
+abscissa when the reconstructed modal loading is full rank. A nonnormal matrix
+can still have transient growth. Inspect all three stability measures:
+
+```r
+stability_diagnostics(fit, branch = "stable", horizon = 2)
+```
+
+Single-trajectory identifiability is a property of `(A, x0)`. Install
+`ode.ident` from `qiuxing/ode.ident` and inspect ICIS with:
+
+```r
+identifiability_diagnostics(sim$A, sim$x0)
+```
 
 ## Optional Torch backend
 
@@ -171,4 +192,7 @@ again with the same output directory resumes the study.
 
 The current model assumes a constant, autonomous, homogeneous linear ODE with
 all states observed and a complete diagonalizable real modal representation.
-The approximate Wald calculations condition on the fitted initial state.
+The modal and coefficient Wald calculations condition on the fitted initial
+state. The coefficient calculation follows the trajectory-sensitivity Fisher
+information of Wu et al. (2019); after stability-constrained boundary fitting,
+its normal reference distribution should be checked by simulation.

@@ -37,8 +37,18 @@ model.}
 A numeric matrix.
 }
 \description{
-Computes approximate coefficientwise Wald statistics for the entries of the
-fitted system matrix and optionally applies a multiple-testing correction.
-These tests condition on the fitted initial state and should be treated as
-large-sample approximations.
+Computes coefficientwise Wald statistics for the entries of the fitted
+system matrix using the trajectory-sensitivity tensor and total Fisher
+information developed for matrix-based linear ODE estimation by Wu et al.
+(2019), and optionally applies a multiple-testing correction. The current
+plug-in implementation conditions on the fitted initial state. For a
+stability-constrained estimate on the boundary, its ordinary normal
+reference distribution remains a working approximation and should be
+calibrated by simulation.
+}
+\references{
+Wu, L., Qiu, X., Yuan, Y.-X., and Wu, H. (2019).
+Parameter estimation and variable selection for big systems of linear
+ordinary differential equations: A matrix-based approach. \emph{Journal of the
+American Statistical Association}, 114(526), 657-667.
 }

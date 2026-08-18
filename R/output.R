@@ -58,7 +58,8 @@ ada_output <- function(a, b, cc = NULL, tt, Y, ridge.pen = 1e-3,
       full_modal_rank = rank_P == nrow(P),
       loading_condition = .safe_kappa(P),
       gram_condition = profile$gram_condition,
-      spectral_abscissa = max(Re(actual_eigenvalues))
+      spectral_abscissa = max(Re(actual_eigenvalues)),
+      numerical_abscissa = .numerical_abscissa(A_hat)
     )
   )
 
