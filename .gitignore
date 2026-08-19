@@ -9,3 +9,13 @@ vignettes/*.html
 vignettes/*.pdf
 vignettes/simulation-study.R
 README.html
+
+# Paper writing and generated analyses belong in the separate paper repository.
+manuscript/
+paper-analysis/
+analysis/
+results/
+figures/
+tables/
+adastablenet-*-results/
+AdaStableNet-paper-simulation/

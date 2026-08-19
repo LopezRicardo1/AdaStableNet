@@ -4,12 +4,13 @@
 \alias{coef.adastablenet_fit}
 \title{Extract the Estimated Dynamic Matrix}
 \usage{
-\method{coef}{adastablenet_fit}(object, branch = c("stable", "wald", "unbounded"), ...)
+\method{coef}{adastablenet_fit}(object, branch = c("stable", "wald", "unbounded", "two_stage"), ...)
 }
 \arguments{
 \item{object}{An \code{adastablenet_fit} object.}
 
-\item{branch}{One of \code{"stable"}, \code{"wald"}, or \code{"unbounded"}.}
+\item{branch}{One of \code{"stable"}, \code{"wald"}, \code{"unbounded"}, or
+\code{"two_stage"}.}
 
 \item{...}{Unused.}
 }

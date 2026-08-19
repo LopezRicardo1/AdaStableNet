@@ -8,7 +8,7 @@
   object,
   new_time = object$time,
   x0 = NULL,
-  branch = c("stable", "wald", "unbounded"),
+  branch = c("stable", "wald", "unbounded", "two_stage"),
   time_origin = object$time_origin,
   ...
 )
@@ -18,9 +18,12 @@
 
 \item{new_time}{Numeric prediction times. Defaults to observed times.}
 
-\item{x0}{Optional state at \code{time_origin}; defaults to the fitted state.}
+\item{x0}{Optional state at \code{time_origin}; defaults to the state estimated
+from the fitted modal curve, or to the spline-reconstructed state for the
+\code{"two_stage"} branch.}
 
-\item{branch}{One of \code{"stable"}, \code{"wald"}, or \code{"unbounded"}.}
+\item{branch}{One of \code{"stable"}, \code{"wald"}, \code{"unbounded"}, or
+\code{"two_stage"}.}
 
 \item{time_origin}{Time represented by \code{x0}.}
 

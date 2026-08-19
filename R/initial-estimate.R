@@ -109,6 +109,7 @@ ode2stage <- function(Y, tt, nbasis = 25, lambda_range = c(-16, 4),
   structure(list(
     Bsplines = fdlist,
     Yhat_fd = Yhat_fd,
+    x0_hat = as.numeric(Yhat_fd[1L, ]),
     z.complex = modes$values,
     re.hat = modes$re,
     im.hat = modes$im,

@@ -7,6 +7,14 @@ test_that("stability diagnostics distinguish spectral and transient behavior", {
   expect_false(result$euclidean_dissipative)
   expect_gt(result$transient$maximum, 1)
   expect_equal(length(result$transient$time), 21)
+  expect_equal(result$tolerance, sqrt(.Machine$double.eps))
+
+  marginal <- stability_diagnostics(
+    structure(list(A_hat = diag(c(1e-15, -0.1))),
+              class = "adastablenet_stage"),
+    horizon = 0, n_grid = 2
+  )
+  expect_true(marginal$spectrally_stable)
 })
 
 test_that("ode.ident diagnostics expose ICIS when available", {

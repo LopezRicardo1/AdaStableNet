@@ -1,8 +1,8 @@
 ---
-title: "Simulation Study for AdaStableNet"
+title: "Simulation and Network-Recovery Example for AdaStableNet"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Simulation Study for AdaStableNet}
+  %\VignetteIndexEntry{Simulation and Network-Recovery Example for AdaStableNet}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -15,8 +15,8 @@ set.seed(2026)
 
 ## Purpose
 
-This vignette provides an executable version of the simulation framework used
-to assess AdaStableNet. The main estimand is the matrix (A) in
+This vignette provides a compact executable example for checking AdaStableNet
+on simulated data. The main estimand is the matrix (A) in
 
 \[
 X'(t)=A X(t), \qquad X(t)=\exp\{A(t-t_0)\}X(t_0).
@@ -134,6 +134,51 @@ fit <- FitAdaStableNet(
 summary(fit)
 ```
 
+## Coefficient-Wald sparsification and network recovery
+
+The modal `wald` branch and coefficient sparsification are different steps.
+The former screens modal real parts before constrained fitting. The latter
+tests entries of the assembled coefficient matrix. For the network, only
+off-diagonal entries are eligible edges: under `X'(t)=AX(t)`, `A[i,j]` is the
+directed effect `j -> i`. Diagonal coefficients are self-dynamics rather than
+edges.
+
+```{r one-network}
+coefficient_network <- AdaStableNet_WaldNetwork(
+  fit,
+  example_system$Y[train, ],
+  example_system$time[train],
+  branch = "stable",
+  method = "BH",
+  alpha = 0.05,
+  diagonal = "keep",
+  nsteps = 6,
+  stability_horizon = 2,
+  stability_n_grid = 21
+)
+
+coefficient_network$adjacency
+coefficient_network$A_network
+coefficient_network$A_sparse
+head(coefficient_network$edge_table)
+```
+
+`adjacency` is binary and `A_network` is the signed, weighted graph; both have
+zero diagonals. `A_sparse` is the matrix that can be inserted back into the ODE
+and therefore retains diagonal self-dynamics by default. Thresholding is not a
+spectral operation and can change stability, so the object records diagnostics
+for both the fitted and sparsified matrices. The primary fitted trajectory
+should continue to use the unthresholded branch; prediction under `A_sparse`
+is reported as a sensitivity analysis.
+
+In simulation, edge support is known. ROC AUC and precision-recall AUC must be
+computed by sweeping the continuous absolute Wald score over all
+off-diagonal coefficients, not from the single BH network. The prespecified
+BH network at `alpha = 0.05` supplies power, false-positive rate, false-
+discovery proportion, precision, F1, and sign recovery. For observed data,
+where support is unknown, ROC claims are replaced by BH-selected edges,
+bootstrap or replicate selection frequency, and sign reproducibility.
+
 ## Optimization backends
 
 `backend = "base"` is the portable default and uses finite-difference BFGS
@@ -175,15 +220,14 @@ matlines(example_system$time, forecast, lty = 2, col = "#0072B2")
 abline(v = 1, lty = 3)
 ```
 
-## Independent Monte Carlo experiment
+## Compact Monte Carlo example
 
-The compact experiment runs during package checks. Set the environment variable
-`ADASTABLENET_FULL_VIGNETTE=true` before rendering to increase the replication
-count. A paper-scale run should use a job array and preserve one result file per
-design condition.
+The deliberately small experiment below illustrates independent refitting while
+remaining appropriate for package documentation. Large simulation designs and
+their checkpoints belong in a separate analysis repository.
 
 ```{r simulation}
-n_rep <- if (identical(Sys.getenv("ADASTABLENET_FULL_VIGNETTE"), "true")) 100L else 2L
+n_rep <- 2L
 design <- expand.grid(
   spectrum = c("stable", "marginal", "mixed"),
   replicate = seq_len(n_rep),
@@ -208,6 +252,7 @@ for (i in seq_len(nrow(design))) {
   fitted_model <- FitAdaStableNet(
     sim$Y[train, ], sim$time[train],
     nbasis = 12, lambda_range = c(-14, 1), twoSE = FALSE,
+    fit_ode2fd = TRUE,
     num_iter = 80, wald_nsteps = 4,
     seed = 2000 + i, verbose = FALSE
   )
@@ -221,15 +266,7 @@ for (i in seq_len(nrow(design))) {
 
   for (method in names(estimates)) {
     A_hat <- estimates[[method]]
-    if (method == "two_stage") {
-      predicted <- t(vapply(
-        sim$time,
-        function(ti) as.numeric(expm::expm(ti * A_hat) %*% sim$Y[1, ]),
-        numeric(nrow(A_hat))
-      ))
-    } else {
-      predicted <- predict(fitted_model, sim$time, branch = method)
-    }
+    predicted <- predict(fitted_model, sim$time, branch = method)
     future <- sim$time > 1
     row_id <- row_id + 1L
     results[[row_id]] <- data.frame(
@@ -266,62 +303,6 @@ boxplot(
 )
 ```
 
-## Paper-scale protocol
-
-The complete sourceable runner is installed with the package. A two-replication
-check can be launched with:
-
-```{r source-runner, eval=FALSE}
-Sys.setenv(
-  ADASTABLENET_N_REP = 2,
-  ADASTABLENET_NOISE_SD = "0.30",
-  ADASTABLENET_BACKEND = "base",
-  ADASTABLENET_OUTPUT_DIR = file.path(
-    getwd(), "adastablenet-simulation-results"
-  )
-)
-source(system.file(
-  "scripts", "run-simulation-study.R",
-  package = "AdaStableNet"
-))
-```
-
-It writes one checkpoint after every fitted replication and can therefore be
-resumed safely by sourcing the script again with the same output directory.
-
-The journal simulation should extend the executable experiment along the
-following prespecified axes:
-
-| Factor | Recommended levels |
-|---|---|
-| Spectrum | stable, marginal, mixed, near-boundary, unstable |
-| Dimension (p) | 15 and 16 for the primary sparse designs |
-| Observation times | 31, 61, 101 |
-| Noise SD | 0.05, 0.15, 0.30 |
-| Matrix structure | sparse (primary), dense (sensitivity analysis) |
-| Optimization backend | base, torch; report device and package version |
-| Sparse loading threshold | 0.25, 0.50, 0.65 |
-| Dense loading condition number | 1, 10, 50 |
-| Replications per retained condition | at least 500; 1000 for the main conditions |
-
-The primary comparisons are the two-stage initializer and the unbounded,
-Wald-screened, and stable AdaStableNet branches. External methods such as STSLS
-should be included only through a portable, versioned implementation with the
-same input data and tuning protocol.
-
-Each result record should contain matrix error, matched eigenvalue error,
-spectral-abscissa error, stability classification, in-range trajectory error,
-future prediction error, convergence code, loading rank and condition number,
-proportions of structural zeros in (Q) and (A), optimization backend and device,
-and elapsed time.
-Oracle-initial-state forecasts and estimated-initial-state forecasts answer
-different questions and must be reported separately.
-
-For Wald inference, additional null and alternative conditions should report
-type-I error, power, interval coverage, false discovery rate, and edge-selection
-accuracy. Monte Carlo standard errors and paired method differences should
-accompany all summary tables.
-
 ## Stability, coefficient inference, and identifiability
 
 The `stable` branch is the constrained optimization, not the coefficient Wald
@@ -338,7 +319,7 @@ recovery. The usual normal reference is a working approximation for a
 boundary-constrained estimate.
 
 When `ode.ident` is installed, `identifiability_diagnostics(A, x0)` exposes the
-Qiu et al. initial-condition identifiability score (ICIS). A paper simulation
-should retain the full population of generated initial conditions and analyze
-performance by ICIS stratum; retaining only the largest ICIS values would
-optimistically select the easiest trajectories.
+Qiu et al. initial-condition identifiability score (ICIS). When ICIS is used in
+a research analysis, retain the full population of generated initial conditions;
+retaining only the largest ICIS values would optimistically select the easiest
+trajectories.

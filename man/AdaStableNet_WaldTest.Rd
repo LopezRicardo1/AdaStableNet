@@ -34,7 +34,8 @@ model.}
 \item{variance_ridge}{Fisher-information ridge multiplier.}
 }
 \value{
-A numeric matrix.
+A numeric matrix. For off-diagonal network recovery with separate
+treatment of self-dynamics, use \code{\link[=AdaStableNet_WaldNetwork]{AdaStableNet_WaldNetwork()}}.
 }
 \description{
 Computes coefficientwise Wald statistics for the entries of the fitted

@@ -6,7 +6,7 @@
 \usage{
 \method{residuals}{adastablenet_fit}(
   object,
-  branch = c("stable", "wald", "unbounded"),
+  branch = c("stable", "wald", "unbounded", "two_stage"),
   observed = TRUE,
   ...
 )
@@ -14,7 +14,8 @@
 \arguments{
 \item{object}{An \code{adastablenet_fit} object.}
 
-\item{branch}{One of \code{"stable"}, \code{"wald"}, or \code{"unbounded"}.}
+\item{branch}{One of \code{"stable"}, \code{"wald"}, \code{"unbounded"}, or
+\code{"two_stage"}.}
 
 \item{observed}{If \code{TRUE}, compute residuals against the original observations;
 otherwise use the data supplied to modal fitting.}

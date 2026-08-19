@@ -1,15 +1,17 @@
 Package: AdaStableNet
 Title: Adaptive Eigenvalue-Based Estimation of Linear ODE Systems
-Version: 0.3.1
+Version: 0.4.2
 Authors@R: person("Ricardo J.", "Lopez Candelaria", 
                   email = "rlopez.research@gmail.com", 
                   role = c("aut", "cre"))
 Description: Estimates constant system matrices in autonomous linear ordinary
     differential equations from noisy multivariate trajectories. A functional
-    data estimate initializes a profiled nonlinear least-squares fit in a real
-    modal basis. Unconstrained, Wald-thresholded, and stability-constrained
+    data reconstruction initializes and supplies the default fitting target
+    for a profiled nonlinear least-squares fit in a real modal basis.
+    Unconstrained, Wald-thresholded, and stability-constrained
     estimates are provided together with prediction, diagnostics, approximate
-    coefficient inference, and simulation utilities.
+    coefficient inference, Wald-sparsified network recovery, and simulation
+    utilities.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Language: en-US

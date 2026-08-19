@@ -6,21 +6,26 @@
 \usage{
 stability_diagnostics(
   object,
-  branch = c("stable", "wald", "unbounded"),
+  branch = c("stable", "wald", "unbounded", "two_stage"),
   horizon = 1,
-  n_grid = 101L
+  n_grid = 101L,
+  tolerance = sqrt(.Machine$double.eps)
 )
 }
 \arguments{
 \item{object}{An \code{adastablenet_fit} or \code{adastablenet_stage} object.}
 
-\item{branch}{One of \code{"stable"}, \code{"wald"}, or \code{"unbounded"} when \code{object}
-is a complete fit.}
+\item{branch}{One of \code{"stable"}, \code{"wald"}, \code{"unbounded"}, or
+\code{"two_stage"} when \code{object} is a complete fit.}
 
 \item{horizon}{Nonnegative horizon over which transient amplification is
 evaluated.}
 
 \item{n_grid}{Number of equally spaced evaluation times.}
+
+\item{tolerance}{Nonnegative numerical tolerance for classifying spectral
+and numerical abscissae as nonpositive. The raw abscissae are always
+returned.}
 }
 \value{
 A list containing the spectral abscissa, numerical abscissa,

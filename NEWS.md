@@ -1,3 +1,46 @@
+# AdaStableNet 0.4.2
+
+* Moved the paper-scale Monte Carlo runner and journal-specific simulation
+  protocol to the separate paper-analysis repository. Package installations now
+  contain only the reusable estimator, diagnostics, tests, and compact package
+  documentation.
+* Added build and Git exclusions that prevent manuscript sources, paper results,
+  figures, and analysis directories from being included accidentally in the R
+  package repository or source tarball.
+
+# AdaStableNet 0.4.1
+
+* Standardized non-oracle prediction across all four branches: the two-stage
+  branch now starts from the B-spline-reconstructed state at the training
+  origin, while the modal branches retain their profiled fitted initial state.
+* Added `"two_stage"` support to `coef()`, `fitted()`, `residuals()`,
+  `predict()`, `plot()`, and `stability_diagnostics()` for a single, auditable
+  prediction path.
+* The simulation workflow now explicitly sets `fit_ode2fd = TRUE`, records the
+  functional-data prediction contract, and invalidates older checkpoints that
+  used a noisy first observation for the two-stage forecast.
+* Trajectory plots now distinguish observed points, the B-spline
+  reconstruction, and the fitted ODE curve.
+
+# AdaStableNet 0.4.0
+
+* Added `AdaStableNet_WaldNetwork()` for off-diagonal, BH-adjusted directed
+  network recovery. It returns binary adjacency, signed selected weights, a
+  dynamic matrix that retains self-dynamics, a complete edge table, and
+  stability diagnostics before and after sparsification.
+* Added `summarize_wald_networks()` for replicate or bootstrap selection
+  frequency, directional selection frequency, and sign consistency in
+  observed-data applications where support truth and ROC curves are absent.
+* Extended coefficient-Wald simulation evaluation to all four estimators with
+  off-diagonal ROC AUC, precision-recall AUC, power, false-positive and false-
+  discovery rates, precision, F1, sign recovery, sparse-matrix error, and
+  post-sparsification stability and forecasting metrics.
+* Simulation checkpoints now retain every edge-level Wald result and
+  sparsified matrix in `wald-networks.rds` for reproducible threshold curves.
+* Stability classification now uses a documented square-root machine-precision
+  tolerance by default, avoiding false instability labels from reconstruction
+  roundoff while retaining the raw abscissa.
+
 # AdaStableNet 0.3.0
 
 * Added optional `backend = "torch"` optimization with float64 autograd,

@@ -119,8 +119,45 @@
   sqrt(sum((estimate - truth)^2)) / denominator
 }
 
-.resolve_branch <- function(object, branch = c("stable", "wald", "unbounded")) {
+.two_stage_stage <- function(object) {
+  if (!inherits(object, "adastablenet_fit")) {
+    stop("The `two_stage` branch requires a complete AdaStableNet fit.",
+         call. = FALSE)
+  }
+  A_hat <- unname(object$Ode2Stage$Ahat)
+  x0_hat <- as.numeric(
+    object$Ode2Stage$x0_hat %||% object$Ode2Stage$Yhat_fd[1L, ]
+  )
+  prediction <- .matrix_trajectory(
+    A_hat, object$time, x0_hat, origin = object$time_origin
+  )
+  eigenvalues <- eigen(A_hat, only.values = TRUE)$values
+  structure(list(
+    A_hat = A_hat,
+    x0_hat = x0_hat,
+    X_hat = unname(t(prediction)),
+    residuals = unname(t(object$Ode2Stage$Yhat_fd - prediction)),
+    eigenvalues = eigenvalues,
+    time = object$time,
+    relative_time = object$time - object$time_origin,
+    time_origin = object$time_origin,
+    diagnostics = list(
+      loss = mean((object$Ode2Stage$Yhat_fd - prediction)^2),
+      backend = "functional-data gradient matching",
+      spectral_abscissa = max(Re(eigenvalues)),
+      numerical_abscissa = .numerical_abscissa(A_hat),
+      modal_rank = NA_integer_,
+      loading_condition = NA_real_
+    )
+  ), class = "adastablenet_stage")
+}
+
+.resolve_branch <- function(
+    object, branch = c("stable", "wald", "unbounded", "two_stage")) {
   branch <- match.arg(branch)
+  if (branch == "two_stage") {
+    return(.two_stage_stage(object))
+  }
   stages <- if (inherits(object, "adastablenet_fit")) {
     object$AdaEigenStableNet
   } else {

@@ -12,7 +12,9 @@ $$
 
 from a noisy multivariate trajectory. It combines functional-data
 smoothing, gradient-matching initialization, and profiled nonlinear
-least squares in a real modal basis. The package returns unconstrained,
+least squares in a real modal basis. By default, the profiled ODE
+branches are fitted to the B-spline-reconstructed trajectory rather than
+directly to the noisy values. The package returns unconstrained,
 Wald-screened, and stability-constrained fits together with diagnostics
 and forecasting methods.
 
@@ -69,6 +71,7 @@ fit <- FitAdaStableNet(
   sim$time,
   nbasis = 12,
   twoSE = FALSE,
+  fit_ode2fd = TRUE,
   eigen_real_wald = FALSE,
   num_iter = 100,
   verbose = FALSE
@@ -94,12 +97,14 @@ summary(fit)
     ##   Dimensions: 31 time points x 3 states
     ##   Smoothing: Minimum GCV (lambda = 5.584e-05)
     ##
-    ##     branch backend        mse spectral_abscissa numerical_abscissa modal_rank
-    ##  unbounded    base 0.00018312         -0.047677            0.34745          3
-    ##     stable    base 0.00018312         -0.047677            0.34745          3
-    ##  loading_condition convergence evaluations
-    ##             2.2526           0           9
-    ##             2.2526           0          10
+    ##     branch                           backend        mse spectral_abscissa
+    ##  two_stage functional-data gradient matching 0.00068689         -0.047543
+    ##  unbounded                              base 0.00018312         -0.047677
+    ##     stable                              base 0.00018312         -0.047677
+    ##  numerical_abscissa modal_rank loading_condition convergence evaluations
+    ##             0.35261         NA                NA          NA          NA
+    ##             0.34745          3            2.2526           0           9
+    ##             0.34745          3            2.2526           0          10
 
 The fitted dynamic matrix and future trajectory use standard R methods:
 
@@ -117,6 +122,13 @@ head(future)
     ## [5,] 0.4712574 0.8694946 -1.976563
     ## [6,] 0.3616997 0.8361743 -2.009935
 
+`predict()` propagates the fitted ODE with a matrix exponential. The
+profiled branches start from their fitted modal state;
+`branch = "two_stage"` starts from the B-spline-reconstructed state at
+the first training time. Thus the forecast is a smooth ODE solution, not
+a spline extrapolation and not a curve anchored to the first noisy
+measurement.
+
 ## Model branches
 
 - `unbounded` estimates modal real parts without a sign constraint.
@@ -131,6 +143,159 @@ performs the Wu et al. (2019) trajectory-sensitivity Wald test for
 individual entries of the coefficient matrix. The `wald` branch instead
 screens modal real parts, and the `stable` branch imposes the spectral
 constraint.
+
+## Wald-sparsified interaction network
+
+Use `AdaStableNet_WaldNetwork()` to convert coefficient tests into a
+directed network. In `X'(t) = A X(t)`, entry `A[i, j]` is the edge from
+state `j` to state `i`. BH adjustment is applied only to off-diagonal
+edges. Diagonal self-dynamics are retained in `A_sparse` by default but
+are zero in the adjacency and weighted network.
+
+``` r
+network <- AdaStableNet_WaldNetwork(
+  fit, sim$Y, sim$time,
+  branch = "stable", method = "BH", alpha = 0.05,
+  nsteps = 4, stability_horizon = 1, stability_n_grid = 11
+)
+
+network$adjacency       # binary directed graph, diagonal is zero
+```
+
+    ##       source
+    ## target X1 X2 X3
+    ##     X1  0  1  0
+    ##     X2  1  0  1
+    ##     X3  0  1  0
+
+``` r
+network$A_network       # selected signed off-diagonal weights
+```
+
+    ##       source
+    ## target       X1        X2       X3
+    ##     X1 0.000000 -6.231668 0.000000
+    ##     X2 5.550812  0.000000 2.015903
+    ##     X3 0.000000 -2.368519 0.000000
+
+``` r
+network$A_sparse        # ODE matrix: selected edges plus self-dynamics
+```
+
+    ##       source
+    ## target         X1          X2         X3
+    ##     X1 -0.1499917 -6.23166847  0.0000000
+    ##     X2  5.5508115  0.05004857  2.0159026
+    ##     X3  0.0000000 -2.36851931 -0.1823235
+
+``` r
+head(network$edge_table)
+```
+
+    ##   source_index target_index source target    estimate standard_error
+    ## 1            1            2     X1     X2  5.55081155     0.08252907
+    ## 2            1            3     X1     X3 -0.02258135     0.05795123
+    ## 3            2            1     X2     X1 -6.23166847     0.08235155
+    ## 4            2            3     X2     X3 -2.36851931     0.06248368
+    ## 5            3            1     X3     X1  0.04708496     0.02872289
+    ## 6            3            2     X3     X2  2.01590262     0.02765958
+    ##       z_score   p_value p_adjusted selected sign
+    ## 1  67.2588684 0.0000000  0.0000000     TRUE    1
+    ## 2  -0.3896612 0.6967871  0.6967871    FALSE   -1
+    ## 3 -75.6715417 0.0000000  0.0000000     TRUE   -1
+    ## 4 -37.9062050 0.0000000  0.0000000     TRUE   -1
+    ## 5   1.6392839 0.1011541  0.1213850    FALSE    1
+    ## 6  72.8826290 0.0000000  0.0000000     TRUE    1
+
+``` r
+network$stability       # stability is recomputed after thresholding
+```
+
+    ## $before
+    ## $branch
+    ## [1] NA
+    ##
+    ## $spectral_abscissa
+    ## [1] -0.04767653
+    ##
+    ## $numerical_abscissa
+    ## [1] 0.3474495
+    ##
+    ## $tolerance
+    ## [1] 1.490116e-08
+    ##
+    ## $spectrally_stable
+    ## [1] TRUE
+    ##
+    ## $euclidean_dissipative
+    ## [1] FALSE
+    ##
+    ## $transient
+    ## $transient$horizon
+    ## [1] 1
+    ##
+    ## $transient$time
+    ##  [1] 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0
+    ##
+    ## $transient$norm
+    ##  [1] 1.0000000 1.0327367 1.0517157 1.0471111 1.0192436 0.9793269 1.0086630
+    ##  [8] 1.0267831 1.0219794 0.9944173 0.9540227
+    ##
+    ## $transient$maximum
+    ## [1] 1.051716
+    ##
+    ## $transient$time_of_maximum
+    ## [1] 0.2
+    ##
+    ##
+    ## attr(,"class")
+    ## [1] "adastablenet_stability_diagnostics"
+    ##
+    ## $after
+    ## $branch
+    ## [1] NA
+    ##
+    ## $spectral_abscissa
+    ## [1] -0.05193204
+    ##
+    ## $numerical_abscissa
+    ## [1] 0.3438177
+    ##
+    ## $tolerance
+    ## [1] 1.490116e-08
+    ##
+    ## $spectrally_stable
+    ## [1] TRUE
+    ##
+    ## $euclidean_dissipative
+    ## [1] FALSE
+    ##
+    ## $transient
+    ## $transient$horizon
+    ## [1] 1
+    ##
+    ## $transient$time
+    ##  [1] 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0
+    ##
+    ## $transient$norm
+    ##  [1] 1.0000000 1.0323550 1.0509011 1.0458170 1.0174620 0.9777357 1.0065717
+    ##  [8] 1.0240964 1.0187660 0.9907462 0.9499824
+    ##
+    ## $transient$maximum
+    ## [1] 1.050901
+    ##
+    ## $transient$time_of_maximum
+    ## [1] 0.2
+    ##
+    ##
+    ## attr(,"class")
+    ## [1] "adastablenet_stability_diagnostics"
+
+Elementwise thresholding can change the eigenvalues, so a stable fitted
+branch does not automatically make `A_sparse` stable. Use the full
+fitted matrix for the primary trajectory estimate and treat
+sparse-matrix forecasting as a sensitivity analysis unless the
+post-sparsification check remains acceptable.
 
 With the default margin, `stable` guarantees a nonpositive realized
 spectral abscissa when the reconstructed modal loading is full rank. A
@@ -195,37 +360,19 @@ number is the intended design. See
 `vignette("simulation-study", package = "AdaStableNet")` for the
 reproducible simulation design and compact benchmark.
 
-## Source the simulation study
+## Package documentation and paper separation
 
-The installed runner uses the original sparse (p=16), seed-777 marginal
-design and (p=15), seed-888 mixed design. This quick run uses two
-replications per design:
+The installed vignette contains a compact, reproducible simulation and
+network- recovery example built from exported package functions:
 
 ``` r
-Sys.setenv(
-  ADASTABLENET_N_REP = 2,
-  ADASTABLENET_NOISE_SD = "0.30",
-  ADASTABLENET_BACKEND = "base",
-  ADASTABLENET_OUTPUT_DIR = file.path(
-    getwd(), "adastablenet-simulation-results"
-  )
-)
-
-source(system.file(
-  "scripts", "run-simulation-study.R",
-  package = "AdaStableNet"
-))
-
-simulation_system_diagnostics
-head(simulation_results)
-simulation_summary
+vignette("simulation-study", package = "AdaStableNet")
 ```
 
-For the paper run, set `ADASTABLENET_N_REP = 500`,
-`ADASTABLENET_NOISE_SD = "0.05,0.15,0.30"`, and choose
-`ADASTABLENET_BACKEND = "base"`, `"torch"`, or `"auto"` before sourcing
-the same file. The runner checkpoints every completed replication, so
-sourcing it again with the same output directory resumes the study.
+Large Monte Carlo drivers, real-data preparation, checkpoints,
+manuscript figures, tables, and journal source files are intentionally
+maintained in a separate paper-analysis repository. They are not
+installed with AdaStableNet.
 
 ## Scope
 

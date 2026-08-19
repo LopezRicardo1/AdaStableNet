@@ -4,5 +4,13 @@
 ^README\.Rmd$
 ^README\.html$
 ^vignettes/simulation-study\.R$
+^vignettes/.*\.(html|pdf)$
 ^cran-comments\.md$
 ^revdep$
+^manuscript$
+^paper-analysis$
+^analysis$
+^results$
+^figures$
+^tables$
+^.*\.Rcheck$

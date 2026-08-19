@@ -7,7 +7,7 @@
 \method{plot}{adastablenet_fit}(
   x,
   type = c("trajectories", "eigenvalues"),
-  branch = c("stable", "wald", "unbounded"),
+  branch = c("stable", "wald", "unbounded", "two_stage"),
   state = seq_len(min(4L, ncol(x$data))),
   ...
 )
@@ -17,7 +17,8 @@
 
 \item{type}{Plot fitted trajectories or estimated eigenvalues.}
 
-\item{branch}{One of \code{"stable"}, \code{"wald"}, or \code{"unbounded"}.}
+\item{branch}{One of \code{"stable"}, \code{"wald"}, \code{"unbounded"}, or
+\code{"two_stage"}.}
 
 \item{state}{State indices for trajectory panels.}
 

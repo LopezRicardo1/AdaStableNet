@@ -19,7 +19,8 @@
 #' @param nsteps Integration intervals for [TheoVar()].
 #' @param variance_ridge Fisher-information ridge multiplier.
 #'
-#' @return A numeric matrix.
+#' @return A numeric matrix. For off-diagonal network recovery with separate
+#'   treatment of self-dynamics, use [AdaStableNet_WaldNetwork()].
 #' @references Wu, L., Qiu, X., Yuan, Y.-X., and Wu, H. (2019).
 #'   Parameter estimation and variable selection for big systems of linear
 #'   ordinary differential equations: A matrix-based approach. *Journal of the

@@ -4,12 +4,13 @@
 \alias{fitted.adastablenet_fit}
 \title{Extract Fitted Trajectories}
 \usage{
-\method{fitted}{adastablenet_fit}(object, branch = c("stable", "wald", "unbounded"), ...)
+\method{fitted}{adastablenet_fit}(object, branch = c("stable", "wald", "unbounded", "two_stage"), ...)
 }
 \arguments{
 \item{object}{An \code{adastablenet_fit} object.}
 
-\item{branch}{One of \code{"stable"}, \code{"wald"}, or \code{"unbounded"}.}
+\item{branch}{One of \code{"stable"}, \code{"wald"}, \code{"unbounded"}, or
+\code{"two_stage"}.}
 
 \item{...}{Unused.}
 }

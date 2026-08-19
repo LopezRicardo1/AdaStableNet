@@ -72,6 +72,14 @@ test_that("high-level fit supports standard model methods", {
   expect_equal(dim(fitted(fit)), dim(sim$Y))
   expect_equal(dim(residuals(fit)), dim(sim$Y))
   expect_equal(dim(predict(fit, seq(0, 2, length.out = 8))), c(8, 3))
+  expect_true(isTRUE(fit$control$fit_ode2fd))
+  expect_equal(fit$fitted_data, fit$Ode2Stage$Yhat_fd)
+  expect_equal(fit$Ode2Stage$x0_hat, fit$Ode2Stage$Yhat_fd[1L, ])
+  two_stage_prediction <- predict(fit, sim$time, branch = "two_stage")
+  expect_equal(dim(two_stage_prediction), dim(sim$Y))
+  expect_equal(two_stage_prediction[1L, ], fit$Ode2Stage$x0_hat,
+               tolerance = 1e-10)
+  expect_equal(fitted(fit, branch = "two_stage"), two_stage_prediction)
   expect_s3_class(summary(fit), "summary.adastablenet_fit")
 })
 
